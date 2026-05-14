@@ -84,8 +84,8 @@ export default function LoginPage() {
               <Image src={logoImage} alt="StockSafe Logo" className="w-12 h-12" />
             </div>
             <h1 className="text-5xl font-bold text-white">
-              <span className="text-blue-700 mr-2">Stock</span>
-              <span className="text-green-700">Safe</span>
+              <span className="text-blue-700 mr-2">Gest</span>
+              <span className="text-green-700">Stock</span>
             </h1>
           </div>
 
@@ -139,7 +139,7 @@ export default function LoginPage() {
             <div className="bg-white p-2 rounded-lg">
               <Image src={logoImage} alt="StockSafe Logo" className="w-8 h-8" />
             </div>
-            <h1 className="text-3xl font-bold text-emerald-600">StockSafe</h1>
+            <h1 className="text-3xl font-bold text-emerald-600">GestStock</h1>
           </div>
 
           {/* Form Card */}

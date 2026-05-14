@@ -48,7 +48,7 @@ export function DashboardHeader({ user, onToggleSidebar }: DashboardHeaderProps)
             <div className="p-1.5 rounded-lg">
               <Image src={logo} alt="StockSafe Logo" className="w-6 h-6" />
             </div>
-            <h3 className="text-xl font-bold"> <span className="text-blue-500">Stock</span><span className="text-emerald-500">Safe</span></h3>
+            <h3 className="text-xl font-bold"> <span className="text-blue-500">Gest</span><span className="text-emerald-500">Stock</span></h3>
           </div>
 
           {/* Hamburger Menu */}
