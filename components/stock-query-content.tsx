@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect, useCallback } from "react"
 import Link from "next/link"
 import {
   Search,
@@ -46,164 +46,14 @@ import {
 } from "@/components/ui/dialog"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
-
-// Mock data
-const mockStockItems = [
-  {
-    id: "1",
-    sku: "FRS-045",
-    description: "Filé de Frango Congelado - 1kg",
-    category: "Congelado",
-    lot: "LOT2025-001",
-    expiryDate: "2025-02-05",
-    daysToExpiry: 15,
-    shelfLifePercent: 8,
-    quantity: 500,
-    unit: "kg",
-    location: "ARM01 > ZF > CA > P01",
-    unitPrice: 18.5,
-    totalValue: 9250,
-    status: "available",
-    entryDate: "2025-01-18",
-    supplier: "Frigorífico Premium",
-    supplierScore: 88,
-  },
-  {
-    id: "2",
-    sku: "ALM-001",
-    description: "Arroz Branco Tipo 1 - Pacote 5kg",
-    category: "Seco",
-    lot: "LOT2025-023",
-    expiryDate: "2025-04-15",
-    daysToExpiry: 84,
-    shelfLifePercent: 65,
-    quantity: 1200,
-    unit: "kg",
-    location: "ARM01 > ZS > CB > P05",
-    unitPrice: 6.8,
-    totalValue: 8160,
-    status: "available",
-    entryDate: "2025-01-10",
-    supplier: "Distribuidora Alimentos",
-    supplierScore: 92,
-  },
-  {
-    id: "3",
-    sku: "BEB-120",
-    description: "Suco de Laranja Natural - 1L",
-    category: "Bebidas",
-    lot: "LOT2025-087",
-    expiryDate: "2025-01-24",
-    daysToExpiry: 3,
-    shelfLifePercent: 15,
-    quantity: 300,
-    unit: "L",
-    location: "ARM01 > ZF > CC > P02",
-    unitPrice: 8.9,
-    totalValue: 2670,
-    status: "available",
-    entryDate: "2025-01-17",
-    supplier: "Hortifruti Verde Vida",
-    supplierScore: 75,
-  },
-  {
-    id: "4",
-    sku: "LMP-089",
-    description: "Detergente Líquido Neutro - 500ml",
-    category: "Limpeza",
-    lot: "LOT2025-045",
-    expiryDate: "2026-06-30",
-    daysToExpiry: 525,
-    shelfLifePercent: 85,
-    quantity: 800,
-    unit: "un",
-    location: "ARM02 > ZS > CA > P10",
-    unitPrice: 3.5,
-    totalValue: 2800,
-    status: "available",
-    entryDate: "2024-12-05",
-    supplier: "Produtos Limpeza Pro",
-    supplierScore: 65,
-  },
-  {
-    id: "5",
-    sku: "FRS-012",
-    description: "Alface Americana Orgânica - Unidade",
-    category: "Fresco",
-    lot: "LOT2025-099",
-    expiryDate: "2025-01-22",
-    daysToExpiry: 1,
-    shelfLifePercent: 20,
-    quantity: 150,
-    unit: "un",
-    location: "ARM01 > ZF > CD > P01",
-    unitPrice: 2.5,
-    totalValue: 375,
-    status: "available",
-    entryDate: "2025-01-20",
-    supplier: "Hortifruti Verde Vida",
-    supplierScore: 75,
-  },
-  {
-    id: "6",
-    sku: "FRS-046",
-    description: "Carne Bovina Moída - 1kg",
-    category: "Congelado",
-    lot: "LOT2025-034",
-    expiryDate: "2025-01-20",
-    daysToExpiry: -1,
-    shelfLifePercent: 0,
-    quantity: 80,
-    unit: "kg",
-    location: "ARM01 > ZC > CA > P03",
-    unitPrice: 25.0,
-    totalValue: 2000,
-    status: "expired",
-    entryDate: "2024-12-20",
-    supplier: "Frigorífico Premium",
-    supplierScore: 88,
-  },
-  {
-    id: "7",
-    sku: "BEB-135",
-    description: "Leite Integral UHT - 1L",
-    category: "Bebidas",
-    lot: "LOT2025-111",
-    expiryDate: "2025-03-10",
-    daysToExpiry: 48,
-    shelfLifePercent: 45,
-    quantity: 600,
-    unit: "L",
-    location: "ARM01 > ZF > CE > P04",
-    unitPrice: 4.2,
-    totalValue: 2520,
-    status: "blocked",
-    entryDate: "2025-01-05",
-    supplier: "Laticínios Premium",
-    supplierScore: 82,
-  },
-  {
-    id: "8",
-    sku: "SEC-078",
-    description: "Macarrão Espaguete Integral - 500g",
-    category: "Seco",
-    lot: "LOT2025-067",
-    expiryDate: "2025-07-20",
-    daysToExpiry: 180,
-    shelfLifePercent: 75,
-    quantity: 950,
-    unit: "kg",
-    location: "ARM01 > ZS > CC > P08",
-    unitPrice: 5.5,
-    totalValue: 5225,
-    status: "available",
-    entryDate: "2025-01-02",
-    supplier: "Distribuidora Alimentos",
-    supplierScore: 92,
-  },
-]
+import { useEstoque } from "@/hooks/useEstoque"
 
 const statusConfig = {
+  DISPONIVEL: { label: "Disponível", color: "bg-green-100 text-green-800", icon: "🟢" },
+  BLOQUEADO: { label: "Bloqueado", color: "bg-red-100 text-red-800", icon: "🔴" },
+  QUARENTENA: { label: "Quarentena", color: "bg-orange-100 text-orange-800", icon: "🟠" },
+  RESTREITO: { label: "Restrito", color: "bg-yellow-100 text-yellow-800", icon: "🟡" },
+  VENCIDO: { label: "Vencido", color: "bg-gray-100 text-gray-800", icon: "⚫" },
   available: { label: "Disponível", color: "bg-green-100 text-green-800", icon: "🟢" },
   blocked: { label: "Bloqueado", color: "bg-red-100 text-red-800", icon: "🔴" },
   quarantine: { label: "Quarentena", color: "bg-orange-100 text-orange-800", icon: "🟠" },
@@ -211,7 +61,10 @@ const statusConfig = {
   expired: { label: "Vencido", color: "bg-gray-100 text-gray-800", icon: "⚫" },
 }
 
+
 export function StockQueryContent() {
+  const { lotes, metricas, loading, carregarEstoque, carregarMetricas } = useEstoque()
+
   const [searchQuery, setSearchQuery] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("Todas")
   const [statusFilter, setStatusFilter] = useState("Todos")
@@ -219,61 +72,55 @@ export function StockQueryContent() {
   const [selectedItems, setSelectedItems] = useState<string[]>([])
   const [showFilters, setShowFilters] = useState(true)
   const [activeTab, setActiveTab] = useState("by-lot")
-  const [selectedLot, setSelectedLot] = useState<typeof mockStockItems[0] | null>(null)
+  const [selectedLot, setSelectedLot] = useState<any | null>(null)
   const [showLotDetails, setShowLotDetails] = useState(false)
 
-  // Filter items
+  // Carregar dados no mount e sempre que os filtros mudarem
+  useEffect(() => {
+    const status = statusFilter === "Todos" ? undefined : statusFilter
+    const search = searchQuery || undefined
+
+    let faixa_validade: string | undefined = undefined
+    if (validityFilter === "all") faixa_validade = "TODOS"
+    else if (validityFilter === "expired") faixa_validade = "VENCIDOS"
+    else if (validityFilter === "7days") faixa_validade = "7_DIAS"
+    else if (validityFilter === "15days") faixa_validade = "15_DIAS"
+    else if (validityFilter === "30days") faixa_validade = "30_DIAS"
+    else if (validityFilter === "60days") faixa_validade = "60_DIAS"
+    else if (validityFilter === "more60days") faixa_validade = "MAIOR_60"
+
+    carregarEstoque({
+      status,
+      search,
+      faixa_validade,
+    })
+  }, [searchQuery, statusFilter, validityFilter, carregarEstoque])
+
+  // Carregar métricas no mount
+  useEffect(() => {
+    carregarMetricas()
+  }, [carregarMetricas])
+
   const filteredItems = useMemo(() => {
-    let filtered = mockStockItems
-
-    // Search
-    if (searchQuery) {
-      filtered = filtered.filter(
-        (item) =>
-          item.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          item.lot.toLowerCase().includes(searchQuery.toLowerCase()),
-      )
+    if (categoryFilter === "Todas") {
+      return lotes
     }
+    return lotes.filter((item) => {
+      const cat = (item.produto as any)?.categoria || ""
+      return cat.toLowerCase() === categoryFilter.toLowerCase()
+    })
+  }, [lotes, categoryFilter])
 
-    // Category
-    if (categoryFilter !== "Todas") {
-      filtered = filtered.filter((item) => item.category === categoryFilter)
-    }
-
-    // Status
-    if (statusFilter !== "Todos") {
-      filtered = filtered.filter((item) => item.status === statusFilter)
-    }
-
-    // Validity
-    if (validityFilter === "expired") {
-      filtered = filtered.filter((item) => item.daysToExpiry < 0)
-    } else if (validityFilter === "7days") {
-      filtered = filtered.filter((item) => item.daysToExpiry >= 0 && item.daysToExpiry <= 7)
-    } else if (validityFilter === "15days") {
-      filtered = filtered.filter((item) => item.daysToExpiry > 7 && item.daysToExpiry <= 15)
-    } else if (validityFilter === "30days") {
-      filtered = filtered.filter((item) => item.daysToExpiry > 15 && item.daysToExpiry <= 30)
-    } else if (validityFilter === "60days") {
-      filtered = filtered.filter((item) => item.daysToExpiry > 30 && item.daysToExpiry <= 60)
-    } else if (validityFilter === "more60days") {
-      filtered = filtered.filter((item) => item.daysToExpiry > 60)
-    }
-
-    return filtered
-  }, [searchQuery, categoryFilter, statusFilter, validityFilter])
-
-  // Calculate KPIs
-  const totalValue = filteredItems.reduce((sum, item) => sum + item.totalValue, 0)
-  const totalItems = filteredItems.length
-  const uniqueLots = new Set(filteredItems.map((item) => item.lot)).size
-  const expiredLots = filteredItems.filter((item) => item.daysToExpiry < 0).length
-  const expiringSoon = filteredItems.filter((item) => item.daysToExpiry >= 0 && item.daysToExpiry <= 7).length
-  const occupationPercent = 68 // Mock calculation
+  // KPIs
+  const totalValue = metricas?.valor_total_estoque || 0
+  const totalItems = metricas?.total_itens || 0
+  const uniqueLots = lotes.length
+  const expiredLots = metricas?.alertas_criticos?.vencidos || 0
+  const expiringSoon = metricas?.alertas_criticos?.menos_7_dias || 0
+  const occupationPercent = metricas?.ocupacao_percentagem || 0
 
   const getValidityColor = (days: number) => {
-    if (days < 0) return "text-red-600 font-semibold"
+    if (days <= 0) return "text-red-600 font-semibold"
     if (days <= 7) return "text-red-600 font-semibold"
     if (days <= 15) return "text-orange-600"
     if (days <= 30) return "text-yellow-600"
@@ -309,7 +156,7 @@ export function StockQueryContent() {
     setValidityFilter("all")
   }
 
-  const viewLotDetails = (item: typeof mockStockItems[0]) => {
+  const viewLotDetails = (item: any) => {
     setSelectedLot(item)
     setShowLotDetails(true)
   }
@@ -317,30 +164,31 @@ export function StockQueryContent() {
   // Group by product for consolidated view
   const groupedByProduct = useMemo(() => {
     const grouped = filteredItems.reduce((acc, item) => {
-      const existing = acc.find((g) => g.sku === item.sku)
+      const sku = item.produto?.sku || ""
+      const existing = acc.find((g) => g.sku === sku)
       if (existing) {
-        existing.totalQty += item.quantity
-        existing.availableQty += item.status === "available" ? item.quantity : 0
-        existing.blockedQty += item.status === "blocked" ? item.quantity : 0
+        existing.totalQty += item.quantidade
+        existing.availableQty += item.status === "DISPONIVEL" ? item.quantidade : 0
+        existing.blockedQty += item.status === "BLOQUEADO" ? item.quantidade : 0
         existing.lotsCount += 1
-        if (item.daysToExpiry < existing.nearestExpiry) {
-          existing.nearestExpiry = item.daysToExpiry
-          existing.nearestExpiryDate = item.expiryDate
+        if (item.dias_restantes < existing.nearestExpiry) {
+          existing.nearestExpiry = item.dias_restantes
+          existing.nearestExpiryDate = item.validade
         }
-        existing.totalValue += item.totalValue
+        existing.totalValue += item.valor_total
       } else {
         acc.push({
-          sku: item.sku,
-          description: item.description,
-          category: item.category,
-          totalQty: item.quantity,
-          availableQty: item.status === "available" ? item.quantity : 0,
-          blockedQty: item.status === "blocked" ? item.quantity : 0,
+          sku: sku,
+          description: item.produto?.descricao || "",
+          category: (item.produto as any)?.categoria || "Geral",
+          totalQty: item.quantidade,
+          availableQty: item.status === "DISPONIVEL" ? item.quantidade : 0,
+          blockedQty: item.status === "BLOQUEADO" ? item.quantidade : 0,
           lotsCount: 1,
-          nearestExpiry: item.daysToExpiry,
-          nearestExpiryDate: item.expiryDate,
-          totalValue: item.totalValue,
-          unit: item.unit,
+          nearestExpiry: item.dias_restantes,
+          nearestExpiryDate: item.validade,
+          totalValue: item.valor_total,
+          unit: item.produto?.unidade_medida || "",
           lots: [item],
         })
       }
@@ -633,13 +481,13 @@ export function StockQueryContent() {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {filteredItems.map((item) => {
-                    const config = statusConfig[item.status as keyof typeof statusConfig]
+                    const config = (item.status && statusConfig[item.status as keyof typeof statusConfig]) || { label: item.status || "Desconhecido", color: "bg-gray-100 text-gray-800", icon: "📦" }
                     const rowClass =
-                      item.daysToExpiry < 0
+                      item.dias_restantes <= 0
                         ? "bg-red-50"
-                        : item.daysToExpiry <= 7
+                        : item.dias_restantes <= 7
                           ? "bg-yellow-50"
-                          : item.status === "blocked"
+                          : item.status === "BLOQUEADO"
                             ? "bg-gray-50"
                             : ""
 
@@ -647,18 +495,18 @@ export function StockQueryContent() {
                       <tr key={item.id} className={`${rowClass} hover:bg-gray-100 transition-colors`}>
                         <td className="px-4 py-3">
                           <Checkbox
-                            checked={selectedItems.includes(item.id)}
-                            onCheckedChange={(checked) => handleSelectItem(item.id, checked as boolean)}
+                             checked={selectedItems.includes(item.id)}
+                             onCheckedChange={(checked) => handleSelectItem(item.id, checked as boolean)}
                           />
                         </td>
                         <td className="px-4 py-3">
                           <div className="min-w-[200px]">
-                            <div className="font-mono text-sm font-medium">{item.sku}</div>
-                            <div className="text-xs text-muted-foreground truncate max-w-[200px]" title={item.description}>
-                              {item.description}
+                            <div className="font-mono text-sm font-medium">{item.produto?.sku}</div>
+                            <div className="text-xs text-muted-foreground truncate max-w-[200px]" title={item.produto?.descricao}>
+                              {item.produto?.descricao}
                             </div>
                             <Badge variant="outline" className="mt-1 text-xs">
-                              {item.category}
+                              {(item.produto as any)?.categoria || "Geral"}
                             </Badge>
                           </div>
                         </td>
@@ -667,42 +515,42 @@ export function StockQueryContent() {
                             onClick={() => viewLotDetails(item)}
                             className="font-mono text-sm text-emerald-600 hover:underline"
                           >
-                            {item.lot}
+                            {item.lote}
                           </button>
                         </td>
                         <td className="px-4 py-3">
                           <div>
-                            <div className="text-sm">{new Date(item.expiryDate).toLocaleDateString("pt-BR")}</div>
-                            <div className={`text-xs ${getValidityColor(item.daysToExpiry)}`}>
-                              {item.daysToExpiry < 0
-                                ? `Vencido há ${Math.abs(item.daysToExpiry)} dias`
-                                : `${item.daysToExpiry} dias restantes`}
+                            <div className="text-sm">{new Date(item.validade).toLocaleDateString("pt-BR")}</div>
+                            <div className={`text-xs ${getValidityColor(item.dias_restantes)}`}>
+                              {item.dias_restantes <= 0
+                                ? `Vencido há ${Math.abs(item.dias_restantes)} dias`
+                                : `${item.dias_restantes} dias restantes`}
                             </div>
                           </div>
                         </td>
                         <td className="px-4 py-3">
                           <div className="space-y-1">
-                            <Progress value={item.shelfLifePercent} className="h-2" />
-                            <div className="text-xs text-center">{item.shelfLifePercent}%</div>
+                            <Progress value={item.percentagem_vida_util} className="h-2" />
+                            <div className="text-xs text-center">{item.percentagem_vida_util}%</div>
                           </div>
                         </td>
                         <td className="px-4 py-3">
                           <div>
-                            <div className="text-sm font-semibold">{item.quantity}</div>
-                            <div className="text-xs text-muted-foreground">{item.unit}</div>
+                            <div className="text-sm font-semibold">{item.quantidade}</div>
+                            <div className="text-xs text-muted-foreground">{item.produto?.unidade_medida}</div>
                           </div>
                         </td>
                         <td className="px-4 py-3">
-                          <div className="text-xs font-mono max-w-[150px] truncate" title={item.location}>
-                            {item.location}
+                          <div className="text-xs font-mono max-w-[150px] truncate" title={item.local_codigo}>
+                            {item.local_codigo}
                           </div>
                         </td>
                         <td className="px-4 py-3">
-                          <div className="text-sm">R$ {item.unitPrice.toFixed(2)}</div>
+                          <div className="text-sm">R$ {item.valor_unitario.toFixed(2)}</div>
                         </td>
                         <td className="px-4 py-3">
                           <div className="text-sm font-semibold">
-                            R$ {item.totalValue.toLocaleString("pt-BR")}
+                            R$ {item.valor_total.toLocaleString("pt-BR")}
                           </div>
                         </td>
                         <td className="px-4 py-3">
@@ -732,7 +580,7 @@ export function StockQueryContent() {
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem>
-                                {item.status === "blocked" ? (
+                                {item.status === "BLOQUEADO" ? (
                                   <>
                                     <Unlock className="w-4 h-4 mr-2" />
                                     Desbloquear
@@ -766,7 +614,7 @@ export function StockQueryContent() {
                       Total de Linhas: {filteredItems.length}
                     </td>
                     <td className="px-4 py-3 text-sm">
-                      {filteredItems.reduce((sum, item) => sum + item.quantity, 0)}
+                      {filteredItems.reduce((sum, item) => sum + item.quantidade, 0)}
                     </td>
                     <td colSpan={2}></td>
                     <td className="px-4 py-3 text-sm">
@@ -856,29 +704,29 @@ export function StockQueryContent() {
           <div className="space-y-4">
             {/* Expired */}
             {expiredLots > 0 && (
-              <Card className="border-red-200">
+              <Card className="border-red-200 shadow-md bg-gradient-to-br from-red-50/50 to-white">
                 <CardContent className="pt-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-semibold flex items-center gap-2">
-                      <AlertCircle className="w-5 h-5 text-red-600" />
-                      🔴 Vencidos ({expiredLots} lotes)
+                  <div className="flex items-center justify-between mb-4 border-b border-red-100 pb-3">
+                    <h3 className="font-semibold flex items-center gap-2 text-red-700">
+                      <AlertCircle className="w-5 h-5 text-red-600 animate-pulse" />
+                      Lotes Vencidos ({expiredLots})
                     </h3>
-                    <Button variant="outline" size="sm" className="text-red-600">
+                    <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50">
                       Iniciar Descarte de Todos
                     </Button>
                   </div>
                   <div className="space-y-2">
                     {filteredItems
-                      .filter((item) => item.daysToExpiry < 0)
+                      .filter((item) => item.dias_restantes <= 0)
                       .map((item) => (
-                        <div key={item.id} className="flex items-center justify-between bg-red-50 rounded p-3">
+                        <div key={item.id} className="flex items-center justify-between bg-white border border-red-100 rounded-lg p-3.5 shadow-sm hover:border-red-300 transition-all">
                           <div>
-                            <div className="font-medium text-sm">{item.sku} - {item.description}</div>
-                            <div className="text-xs text-muted-foreground">
-                              Lote: {item.lot} | Vencido há {Math.abs(item.daysToExpiry)} dias
+                            <div className="font-medium text-sm text-gray-800">{item.produto?.sku} - {item.produto?.descricao}</div>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              Lote: <span className="font-mono text-emerald-600 font-semibold">{item.lote}</span> | Local: <span className="font-mono">{item.local_codigo}</span> | Vencido há <span className="text-red-600 font-semibold">{Math.abs(item.dias_restantes)}</span> dias
                             </div>
                           </div>
-                          <Badge variant="destructive">Vencido</Badge>
+                          <Badge variant="destructive" className="bg-red-500 hover:bg-red-600">Vencido</Badge>
                         </div>
                       ))}
                   </div>
@@ -888,34 +736,44 @@ export function StockQueryContent() {
 
             {/* Expiring Soon */}
             {expiringSoon > 0 && (
-              <Card className="border-orange-200">
+              <Card className="border-orange-200 shadow-md bg-gradient-to-br from-orange-50/50 to-white">
                 <CardContent className="pt-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-semibold flex items-center gap-2">
+                  <div className="flex items-center justify-between mb-4 border-b border-orange-100 pb-3">
+                    <h3 className="font-semibold flex items-center gap-2 text-orange-700">
                       <AlertCircle className="w-5 h-5 text-orange-600" />
-                      🟠 Vence em ≤ 7 dias ({expiringSoon} lotes)
+                      Vence em ≤ 7 dias ({expiringSoon})
                     </h3>
-                    <Button variant="outline" size="sm" className="text-orange-600">
+                    <Button variant="outline" size="sm" className="text-orange-600 border-orange-200 hover:bg-orange-50">
                       Criar Campanha de Escoamento
                     </Button>
                   </div>
                   <div className="space-y-2">
                     {filteredItems
-                      .filter((item) => item.daysToExpiry >= 0 && item.daysToExpiry <= 7)
+                      .filter((item) => item.dias_restantes > 0 && item.dias_restantes <= 7)
                       .map((item) => (
-                        <div key={item.id} className="flex items-center justify-between bg-orange-50 rounded p-3">
+                        <div key={item.id} className="flex items-center justify-between bg-white border border-orange-100 rounded-lg p-3.5 shadow-sm hover:border-orange-300 transition-all">
                           <div>
-                            <div className="font-medium text-sm">{item.sku} - {item.description}</div>
-                            <div className="text-xs text-muted-foreground">
-                              Lote: {item.lot} | Vence em {item.daysToExpiry} dias
+                            <div className="font-medium text-sm text-gray-800">{item.produto?.sku} - {item.produto?.descricao}</div>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              Lote: <span className="font-mono text-emerald-600 font-semibold">{item.lote}</span> | Local: <span className="font-mono">{item.local_codigo}</span> | Vence em <span className="text-orange-600 font-semibold">{item.dias_restantes}</span> dias
                             </div>
                           </div>
-                          <Badge className="bg-orange-500">Urgente</Badge>
+                          <Badge className="bg-orange-500 hover:bg-orange-600">Urgente</Badge>
                         </div>
                       ))}
                   </div>
                 </CardContent>
               </Card>
+            )}
+
+            {expiredLots === 0 && expiringSoon === 0 && (
+              <div className="text-center py-12">
+                <Package className="w-16 h-16 text-gray-200 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">Sem Alertas Críticos</h3>
+                <p className="text-muted-foreground text-sm">
+                  Todos os lotes estão em condições ideais de validade e com prazo saudável.
+                </p>
+              </div>
             )}
           </div>
         </TabsContent>
@@ -934,45 +792,46 @@ export function StockQueryContent() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>Produto</Label>
-                  <div className="font-medium">{selectedLot.sku} - {selectedLot.description}</div>
+                  <Label className="text-muted-foreground">Produto</Label>
+                  <div className="font-medium text-sm mt-0.5">{selectedLot.produto?.sku} - {selectedLot.produto?.descricao}</div>
                 </div>
                 <div>
-                  <Label>Lote</Label>
-                  <div className="font-mono font-medium">{selectedLot.lot}</div>
+                  <Label className="text-muted-foreground">Lote</Label>
+                  <div className="font-mono font-medium text-sm mt-0.5">{selectedLot.lote}</div>
                 </div>
                 <div>
-                  <Label>Validade</Label>
-                  <div>{new Date(selectedLot.expiryDate).toLocaleDateString("pt-BR")}</div>
-                  <div className={`text-xs ${getValidityColor(selectedLot.daysToExpiry)}`}>
-                    {selectedLot.daysToExpiry} dias restantes
+                  <Label className="text-muted-foreground">Validade</Label>
+                  <div className="text-sm mt-0.5">{new Date(selectedLot.validade).toLocaleDateString("pt-BR")}</div>
+                  <div className={`text-xs mt-0.5 ${getValidityColor(selectedLot.dias_restantes)}`}>
+                    {selectedLot.dias_restantes <= 0 ? "Lote Vencido" : `${selectedLot.dias_restantes} dias restantes`}
                   </div>
                 </div>
                 <div>
-                  <Label>Quantidade</Label>
-                  <div className="font-semibold">{selectedLot.quantity} {selectedLot.unit}</div>
+                  <Label className="text-muted-foreground">Quantidade</Label>
+                  <div className="font-semibold text-sm mt-0.5">{selectedLot.quantidade} {selectedLot.produto?.unidade_medida}</div>
                 </div>
                 <div>
-                  <Label>Local</Label>
-                  <div className="font-mono text-sm">{selectedLot.location}</div>
+                  <Label className="text-muted-foreground">Local</Label>
+                  <div className="font-mono text-sm mt-0.5">{selectedLot.local_codigo}</div>
                 </div>
                 <div>
-                  <Label>Status</Label>
-                  <Badge className={statusConfig[selectedLot.status as keyof typeof statusConfig].color}>
-                    {statusConfig[selectedLot.status as keyof typeof statusConfig].label}
-                  </Badge>
+                  <Label className="text-muted-foreground">Status</Label>
+                  <div className="mt-0.5">
+                    <Badge className={(selectedLot.status && statusConfig[selectedLot.status as keyof typeof statusConfig] ? statusConfig[selectedLot.status as keyof typeof statusConfig].color : "bg-gray-100 text-gray-800")}>
+                      {(selectedLot.status && statusConfig[selectedLot.status as keyof typeof statusConfig] ? statusConfig[selectedLot.status as keyof typeof statusConfig].label : selectedLot.status || "Desconhecido")}
+                    </Badge>
+                  </div>
                 </div>
                 <div>
-                  <Label>Fornecedor</Label>
-                  <div>{selectedLot.supplier}</div>
-                  <Badge variant="outline" className="mt-1">Score: {selectedLot.supplierScore}</Badge>
+                  <Label className="text-muted-foreground">Valor Unitário</Label>
+                  <div className="text-sm mt-0.5">R$ {selectedLot.valor_unitario.toFixed(2)}</div>
                 </div>
                 <div>
-                  <Label>Valor Total</Label>
-                  <div className="font-semibold">R$ {selectedLot.totalValue.toLocaleString("pt-BR")}</div>
+                  <Label className="text-muted-foreground">Valor Total</Label>
+                  <div className="font-semibold text-sm mt-0.5">R$ {selectedLot.valor_total.toLocaleString("pt-BR")}</div>
                 </div>
               </div>
-              <div className="flex gap-2 pt-4">
+              <div className="flex gap-2 pt-4 border-t mt-4">
                 <Button size="sm">
                   <Printer className="w-4 h-4 mr-2" />
                   Imprimir Etiqueta
@@ -982,7 +841,7 @@ export function StockQueryContent() {
                   Transferir
                 </Button>
                 <Button size="sm" variant="outline">
-                  {selectedLot.status === "blocked" ? (
+                  {selectedLot.status === "BLOQUEADO" || selectedLot.status === "blocked" ? (
                     <>
                       <Unlock className="w-4 h-4 mr-2" />
                       Desbloquear

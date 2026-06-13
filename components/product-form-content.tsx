@@ -20,6 +20,7 @@ import { GeneralTab } from "./form-tabs/general-tab"
 import { ValidityTab } from "./form-tabs/validity-tab"
 import { TraceabilityTab } from "./form-tabs/traceability-tab"
 import { StorageTab } from "./form-tabs/storage-tab"
+import { produtoService, ProdutoData } from "@/app/services/produtoService"
 
 interface ProductFormContentProps {
   mode: "new" | "edit"
@@ -27,7 +28,7 @@ interface ProductFormContentProps {
 }
 
 export interface ProductFormData {
-  // General
+  // Aba: Geral
   sku: string
   description: string
   category: string
@@ -39,7 +40,7 @@ export interface ProductFormData {
   notes: string
   status: boolean
 
-  // Validity
+  // Aba: Validade
   shelfLife: number
   minValidityType: "percentage" | "days"
   minValidityValue: number
@@ -49,7 +50,7 @@ export interface ProductFormData {
   customAlertDays: number
   minValidityForClient: number
 
-  // Traceability
+  // Aba: Rastreabilidade
   lotControl: boolean
   lotFormat: "free" | "specific"
   lotMask: string
@@ -60,7 +61,7 @@ export interface ProductFormData {
   certifications: string[]
   quarantineDays: number
 
-  // Storage
+  // Aba: Armazenagem
   storageType: {
     temperature: string
     customTempMin?: number
@@ -132,6 +133,119 @@ const initialFormData: ProductFormData = {
   specialInstructions: "",
 }
 
+// ─── Mapeamento: ProdutoData (backend) → ProductFormData (frontend) ────────────
+function mapApiParaFormulario(api: ProdutoData): ProductFormData {
+  // alertas_dias_config guarda o array de dias pré-definidos como JSON
+  let alertDays: number[] = [7, 15, 30]
+  try {
+    if (Array.isArray(api.alertas_dias_config)) alertDays = api.alertas_dias_config
+    else if (typeof api.alertas_dias_config === "string")
+      alertDays = JSON.parse(api.alertas_dias_config)
+  } catch {}
+
+  // restricoes_armazenagem guarda o array de "otherConditions" como JSON
+  let otherConditions: string[] = []
+  try {
+    if (api.restricoes_armazenagem) otherConditions = JSON.parse(api.restricoes_armazenagem)
+  } catch {}
+
+  return {
+    sku: api.sku ?? "",
+    description: api.descricao ?? "",
+    category: api.categoria ?? "",
+    unit: api.unidade_medida ?? "",
+    packSize: api.tamanho_embalagem ?? "",
+    brand: api.marca ?? "",
+    suppliers: [],
+    internalBarcode: api.codigo_barras_interno ?? "",
+    notes: api.observacoes ?? "",
+    status: api.status_ativo ?? true,
+
+    shelfLife: api.vida_util_dias ?? 0,
+    minValidityType: api.tipo_controle_validade === "DIAS" ? "days" : "percentage",
+    minValidityValue: api.validade_min_recebimento ?? 70,
+    expeditionPolicy: (api.politica_expedicao as "FEFO" | "FIFO" | "LIFO") ?? "FEFO",
+    enableAlerts: api.alertas_habilitados ?? true,
+    alertDays,
+    customAlertDays: api.alerta_personalizado_dias ?? 0,
+    minValidityForClient: api.validade_min_cliente_dias ?? 0,
+
+    lotControl: api.controle_lote ?? false,
+    lotFormat: "free",
+    lotMask: "",
+    lotRequiredIn: ["recebimento"],
+    requireDatasheet: api.ficha_tecnica_obrigatoria ?? false,
+    trackBySerial: api.controle_numero_serie ?? false,
+    requireCertifications: api.certificacoes_obrigatorias ?? false,
+    certifications: [],
+    quarantineDays: api.dias_quarentena ?? 0,
+
+    storageType: {
+      temperature: api.condicao_temperatura ?? "ambiente",
+      humidity: api.condicao_umidade ?? "ambiente",
+      otherConditions,
+    },
+    defaultLocations: [],
+    maxStacking: api.empilhamento_maximo ?? 0,
+    weightPerUnit: api.peso_unidade ?? 0,
+    weightUnit: api.unidade_peso ?? "KG",
+    dimensions: {
+      length: api.comprimento_cm ?? 0,
+      width: api.largura_cm ?? 0,
+      height: api.altura_cm ?? 0,
+    },
+    palletType: api.tipo_palete ?? "none",
+    unitsPerPallet: 0,
+    incompatibilities: [],
+    specialInstructions: api.instrucoes_especiais ?? "",
+  }
+}
+
+// ─── Mapeamento: ProductFormData (frontend) → ProdutoData (backend) ────────────
+function mapFormularioParaApi(form: ProductFormData): ProdutoData {
+  return {
+    sku: form.sku,
+    codigo_barras_interno: form.internalBarcode || null,
+    descricao: form.description,
+    categoria: form.category,
+    unidade_medida: form.unit,
+    tamanho_embalagem: form.packSize || null,
+    marca: form.brand || null,
+    observacoes: form.notes || null,
+    status_ativo: form.status,
+
+    vida_util_dias: form.shelfLife,
+    politica_expedicao: form.expeditionPolicy,
+    tipo_controle_validade: form.minValidityType === "days" ? "DIAS" : "PORCENTAGEM",
+    validade_min_recebimento: form.minValidityValue,
+    validade_min_cliente_dias: form.minValidityForClient,
+    alertas_habilitados: form.enableAlerts,
+    alertas_dias_config: form.alertDays,
+    alerta_personalizado_dias: form.customAlertDays,
+
+    controle_lote: form.lotControl,
+    controle_numero_serie: form.trackBySerial,
+    ficha_tecnica_obrigatoria: form.requireDatasheet,
+    certificacoes_obrigatorias: form.requireCertifications,
+    dias_quarentena: form.quarantineDays,
+
+    condicao_temperatura: form.storageType.temperature,
+    condicao_umidade: form.storageType.humidity,
+    restricoes_armazenagem:
+      form.storageType.otherConditions.length > 0
+        ? JSON.stringify(form.storageType.otherConditions)
+        : null,
+    peso_unidade: form.weightPerUnit,
+    unidade_peso: form.weightUnit,
+    comprimento_cm: form.dimensions.length,
+    largura_cm: form.dimensions.width,
+    altura_cm: form.dimensions.height,
+    empilhamento_maximo: form.maxStacking,
+    tipo_palete: form.palletType,
+    instrucoes_especiais: form.specialInstructions || null,
+  }
+}
+
 export function ProductFormContent({ mode, productId }: ProductFormContentProps) {
   const router = useRouter()
   const { toast } = useToast()
@@ -141,86 +255,67 @@ export function ProductFormContent({ mode, productId }: ProductFormContentProps)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [showCancelModal, setShowCancelModal] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [isLoadingData, setIsLoadingData] = useState(false)
 
-  // Load product data in edit mode
+  // ── Carregar dados reais do backend no modo edição ──────────────────────────
   useEffect(() => {
     if (mode === "edit" && productId) {
-      // Mock data for edit mode
-      setFormData({
-        ...initialFormData,
-        sku: "ALM-001",
-        description: "Arroz Branco Tipo 1 - Pacote 5kg",
-        category: "Seco",
-        unit: "UN",
-        packSize: "1x5kg",
-        brand: "Marca Exemplo",
-        status: true,
-        shelfLife: 365,
-        lotControl: true,
-      })
+      setIsLoadingData(true)
+      produtoService
+        .buscarPorId(productId)
+        .then((dadosApi) => {
+          setFormData(mapApiParaFormulario(dadosApi))
+        })
+        .catch(() => {
+          toast({
+            variant: "destructive",
+            title: "Erro ao carregar produto",
+            description: "Não foi possível obter os dados do produto no servidor.",
+          })
+        })
+        .finally(() => setIsLoadingData(false))
     }
   }, [mode, productId])
 
-  // Track changes
+  // Detectar alterações
   useEffect(() => {
     const hasChanges = JSON.stringify(formData) !== JSON.stringify(initialFormData)
     setHasUnsavedChanges(hasChanges)
   }, [formData])
 
   const updateFormData = (field: string, value: any) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value,
-    }))
-    // Clear error for this field
+    setFormData((prev) => ({ ...prev, [field]: value }))
     if (errors[field]) {
       setErrors((prev) => {
-        const newErrors = { ...prev }
-        delete newErrors[field]
-        return newErrors
+        const next = { ...prev }
+        delete next[field]
+        return next
       })
     }
   }
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {}
-
-    // General tab validation
-    if (!formData.sku.trim()) {
-      newErrors.sku = "Campo obrigatório"
-    }
-    if (!formData.description.trim() || formData.description.length < 3) {
+    if (!formData.sku.trim()) newErrors.sku = "Campo obrigatório"
+    if (!formData.description.trim() || formData.description.length < 3)
       newErrors.description = "Descrição deve ter no mínimo 3 caracteres"
-    }
-    if (!formData.category) {
-      newErrors.category = "Campo obrigatório"
-    }
-    if (!formData.unit) {
-      newErrors.unit = "Campo obrigatório"
-    }
-
-    // Validity tab validation
-    if (formData.lotControl && formData.shelfLife <= 0) {
+    if (!formData.category) newErrors.category = "Campo obrigatório"
+    if (!formData.unit) newErrors.unit = "Campo obrigatório"
+    if (formData.lotControl && formData.shelfLife <= 0)
       newErrors.shelfLife = "Campo obrigatório quando controle por lote está ativo"
-    }
-    if (formData.minValidityValue <= 0) {
+    if (formData.minValidityValue <= 0)
       newErrors.minValidityValue = "Valor deve ser maior que zero"
-    }
-
     setErrors(newErrors)
-
-    // Find first tab with errors
     if (Object.keys(newErrors).length > 0) {
-      if (newErrors.sku || newErrors.description || newErrors.category || newErrors.unit) {
+      if (newErrors.sku || newErrors.description || newErrors.category || newErrors.unit)
         setActiveTab("geral")
-      } else if (newErrors.shelfLife || newErrors.minValidityValue) {
+      else if (newErrors.shelfLife || newErrors.minValidityValue)
         setActiveTab("validade")
-      }
     }
-
     return Object.keys(newErrors).length === 0
   }
 
+  // ── Salvar: chama criar ou atualizar no backend ─────────────────────────────
   const handleSave = async (saveAndNew = false) => {
     if (!validateForm()) {
       toast({
@@ -232,32 +327,44 @@ export function ProductFormContent({ mode, productId }: ProductFormContentProps)
     }
 
     setIsSaving(true)
+    const payload = mapFormularioParaApi(formData)
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+    try {
+      if (mode === "new") {
+        await produtoService.criar(payload)
+        toast({
+          title: "Produto cadastrado!",
+          description: `Produto ${formData.sku} foi criado com sucesso.`,
+        })
+      } else if (productId) {
+        await produtoService.atualizar(productId, payload)
+        toast({
+          title: "Produto atualizado!",
+          description: `Produto ${formData.sku} foi salvo com sucesso.`,
+        })
+      }
 
-    toast({
-      title: "Produto salvo com sucesso!",
-      description: `Produto ${formData.sku} foi ${mode === "new" ? "cadastrado" : "atualizado"} com sucesso.`,
-    })
-
-    setIsSaving(false)
-
-    if (saveAndNew) {
-      setFormData(initialFormData)
-      setActiveTab("geral")
-      setHasUnsavedChanges(false)
-    } else {
-      router.push("/cadastros/produtos")
+      if (saveAndNew) {
+        setFormData(initialFormData)
+        setActiveTab("geral")
+        setHasUnsavedChanges(false)
+      } else {
+        router.push("/cadastros/produtos")
+      }
+    } catch (err: any) {
+      toast({
+        variant: "destructive",
+        title: "Erro ao salvar",
+        description: err?.response?.data?.error || "Ocorreu um erro ao comunicar com o servidor.",
+      })
+    } finally {
+      setIsSaving(false)
     }
   }
 
   const handleCancel = () => {
-    if (hasUnsavedChanges) {
-      setShowCancelModal(true)
-    } else {
-      router.push("/cadastros/produtos")
-    }
+    if (hasUnsavedChanges) setShowCancelModal(true)
+    else router.push("/cadastros/produtos")
   }
 
   const confirmCancel = () => {
@@ -271,30 +378,28 @@ export function ProductFormContent({ mode, productId }: ProductFormContentProps)
         return !!(errors.sku || errors.description || errors.category || errors.unit)
       case "validade":
         return !!(errors.shelfLife || errors.minValidityValue)
-      case "rastreabilidade":
-        return false
-      case "armazenagem":
-        return false
       default:
         return false
     }
+  }
+
+  if (isLoadingData) {
+    return (
+      <div className="p-6 flex items-center justify-center h-64 text-muted-foreground">
+        A carregar dados do produto...
+      </div>
+    )
   }
 
   return (
     <div className="p-6">
       {/* Breadcrumb */}
       <div className="text-sm text-muted-foreground mb-4">
-        <Link href="/dashboard" className="hover:text-emerald-600">
-          Home
-        </Link>
+        <Link href="/dashboard" className="hover:text-emerald-600">Home</Link>
         {" / "}
-        <Link href="/cadastros/produtos" className="hover:text-emerald-600">
-          Cadastros
-        </Link>
+        <Link href="/cadastros/produtos" className="hover:text-emerald-600">Cadastros</Link>
         {" / "}
-        <Link href="/cadastros/produtos" className="hover:text-emerald-600">
-          Produtos
-        </Link>
+        <Link href="/cadastros/produtos" className="hover:text-emerald-600">Produtos</Link>
         {" / "}
         <span className="text-foreground">
           {mode === "new" ? "Novo Produto" : `Editar: ${formData.description || formData.sku}`}
@@ -321,76 +426,31 @@ export function ProductFormContent({ mode, productId }: ProductFormContentProps)
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-4 bg-gray-100">
-          <TabsTrigger
-            value="geral"
-            className="relative data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
-          >
-            Geral
-            {getTabErrors("geral") && (
-              <Badge
-                variant="destructive"
-                className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center"
-              >
-                !
-              </Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger
-            value="validade"
-            className="relative data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
-          >
-            Requisitos de Validade
-            {getTabErrors("validade") && (
-              <Badge
-                variant="destructive"
-                className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center"
-              >
-                !
-              </Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger
-            value="rastreabilidade"
-            className="relative data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
-          >
-            Rastreabilidade
-            {getTabErrors("rastreabilidade") && (
-              <Badge
-                variant="destructive"
-                className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center"
-              >
-                !
-              </Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger
-            value="armazenagem"
-            className="relative data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
-          >
-            Armazenagem
-            {getTabErrors("armazenagem") && (
-              <Badge
-                variant="destructive"
-                className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center"
-              >
-                !
-              </Badge>
-            )}
-          </TabsTrigger>
+          {["geral", "validade", "rastreabilidade", "armazenagem"].map((tab) => (
+            <TabsTrigger
+              key={tab}
+              value={tab}
+              className="relative data-[state=active]:bg-emerald-600 data-[state=active]:text-white capitalize"
+            >
+              {tab === "geral" ? "Geral" : tab === "validade" ? "Requisitos de Validade" : tab === "rastreabilidade" ? "Rastreabilidade" : "Armazenagem"}
+              {getTabErrors(tab) && (
+                <Badge variant="destructive" className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center">
+                  !
+                </Badge>
+              )}
+            </TabsTrigger>
+          ))}
         </TabsList>
 
         <TabsContent value="geral">
           <GeneralTab formData={formData} updateFormData={updateFormData} errors={errors} />
         </TabsContent>
-
         <TabsContent value="validade">
           <ValidityTab formData={formData} updateFormData={updateFormData} errors={errors} />
         </TabsContent>
-
         <TabsContent value="rastreabilidade">
           <TraceabilityTab formData={formData} updateFormData={updateFormData} errors={errors} />
         </TabsContent>
-
         <TabsContent value="armazenagem">
           <StorageTab formData={formData} updateFormData={updateFormData} errors={errors} />
         </TabsContent>
@@ -399,9 +459,7 @@ export function ProductFormContent({ mode, productId }: ProductFormContentProps)
       {/* Sticky Footer */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-10">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Button variant="outline" onClick={handleCancel}>
-            Cancelar
-          </Button>
+          <Button variant="outline" onClick={handleCancel}>Cancelar</Button>
           <div className="flex gap-2">
             {mode === "new" && (
               <Button
@@ -421,10 +479,9 @@ export function ProductFormContent({ mode, productId }: ProductFormContentProps)
         </div>
       </div>
 
-      {/* Add padding to prevent content from being hidden by sticky footer */}
       <div className="h-20" />
 
-      {/* Cancel Confirmation Modal */}
+      {/* Modal de confirmação de cancelamento */}
       <Dialog open={showCancelModal} onOpenChange={setShowCancelModal}>
         <DialogContent>
           <DialogHeader>
@@ -432,12 +489,8 @@ export function ProductFormContent({ mode, productId }: ProductFormContentProps)
             <DialogDescription>Você tem alterações não salvas. Deseja realmente sair sem salvar?</DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCancelModal(false)}>
-              Continuar Editando
-            </Button>
-            <Button variant="destructive" onClick={confirmCancel}>
-              Descartar
-            </Button>
+            <Button variant="outline" onClick={() => setShowCancelModal(false)}>Continuar Editando</Button>
+            <Button variant="destructive" onClick={confirmCancel}>Descartar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

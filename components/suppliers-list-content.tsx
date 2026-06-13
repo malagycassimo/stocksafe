@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import Link from "next/link"
 import {
   Search,
@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
 import { Progress } from "@/components/ui/progress"
+import { fornecedorService, FornecedorData } from "@/app/services/fornecedorService"
 
 // Mock data
 const mockSuppliers = [
@@ -136,6 +137,7 @@ const getScoreBarColor = (score: number) => {
 
 export function SuppliersListContent() {
   const { toast } = useToast()
+  const [suppliers, setSuppliers] = useState<any[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("Todos")
   const [scoreFilter, setScoreFilter] = useState("Todos")
@@ -148,10 +150,60 @@ export function SuppliersListContent() {
   const [showExportModal, setShowExportModal] = useState(false)
   const [showBlockModal, setShowBlockModal] = useState(false)
   const [supplierToBlock, setSupplierToBlock] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  // Carregar dados da API
+  const fetchSuppliers = async () => {
+    try {
+      setIsLoading(true)
+      const data = await fornecedorService.listarTodos()
+      if (data && data.length > 0) {
+        const mapped = data.map((s: any) => {
+          const certifications = []
+          if (s.cert_iso9001) certifications.push("ISO 9001")
+          if (s.cert_iso22000) certifications.push("ISO 22000")
+          if (s.cert_haccp) certifications.push("HACCP")
+          if (s.cert_organico) certifications.push("Orgânico")
+          if (s.cert_kosher) certifications.push("Kosher")
+          if (s.cert_halal) certifications.push("Halal")
+          if (s.cert_outras) certifications.push("Outras")
+
+          let status = "Ativo"
+          if (s.situacao === "Bloqueado") {
+            status = "Bloqueado"
+          } else if (!s.status_ativo) {
+            status = "Inativo"
+          }
+
+          return {
+            id: s.id,
+            name: s.razao_social || s.nome_fantasia || "Sem Razão Social",
+            nuit: s.nuit,
+            contact: `${s.email_principal || ""} / ${s.telefone_principal || ""}`,
+            score: 85, // Score padrão
+            certifications,
+            status,
+          }
+        })
+        setSuppliers(mapped)
+      } else {
+        setSuppliers([])
+      }
+    } catch (err) {
+      console.error("Erro ao carregar fornecedores da API, usando mockData", err)
+      setSuppliers(mockSuppliers)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchSuppliers()
+  }, [])
 
   // Filter and sort suppliers
   const filteredSuppliers = useMemo(() => {
-    let filtered = mockSuppliers
+    let filtered = [...suppliers]
 
     // Search filter
     if (searchQuery) {
@@ -200,7 +252,7 @@ export function SuppliersListContent() {
     })
 
     return filtered
-  }, [searchQuery, statusFilter, scoreFilter, certificationFilter, sortField, sortDirection])
+  }, [suppliers, searchQuery, statusFilter, scoreFilter, certificationFilter, sortField, sortDirection])
 
   // Pagination
   const totalPages = Math.ceil(filteredSuppliers.length / itemsPerPage)
@@ -246,13 +298,25 @@ export function SuppliersListContent() {
     setShowExportModal(false)
   }
 
-  const handleBlock = () => {
-    toast({
-      title: "Fornecedor bloqueado",
-      description: "O fornecedor foi bloqueado com sucesso.",
-    })
-    setShowBlockModal(false)
-    setSupplierToBlock(null)
+  const handleBlock = async () => {
+    if (!supplierToBlock) return
+    try {
+      await fornecedorService.atualizar(supplierToBlock, { situacao: "Bloqueado" })
+      toast({
+        title: "Fornecedor bloqueado",
+        description: "O fornecedor foi bloqueado com sucesso.",
+      })
+      fetchSuppliers()
+    } catch (err) {
+      toast({
+        title: "Erro ao bloquear",
+        description: "Não foi possível bloquear o fornecedor.",
+        variant: "destructive",
+      })
+    } finally {
+      setShowBlockModal(false)
+      setSupplierToBlock(null)
+    }
   }
 
   const SortIcon = ({ field }: { field: SortField }) => {
@@ -494,7 +558,7 @@ export function SuppliersListContent() {
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-1">
                           {supplier.certifications.length > 0 ? (
-                            supplier.certifications.map((cert) => (
+                            supplier.certifications.map((cert: string) => (
                               <Badge key={cert} className={certificationColors[cert] || "bg-gray-100 text-gray-800"}>
                                 {cert}
                               </Badge>
@@ -557,7 +621,25 @@ export function SuppliersListContent() {
                                 <Ban className="w-4 h-4 mr-2" />
                                 Bloquear
                               </DropdownMenuItem>
-                              <DropdownMenuItem className="text-red-600">
+                              <DropdownMenuItem
+                                className="text-red-600"
+                                onClick={async () => {
+                                  try {
+                                    await fornecedorService.atualizar(supplier.id, { status_ativo: false })
+                                    toast({
+                                      title: "Fornecedor desativado",
+                                      description: "O fornecedor foi desativado com sucesso.",
+                                    })
+                                    fetchSuppliers()
+                                  } catch (err) {
+                                    toast({
+                                      title: "Erro",
+                                      description: "Não foi possível desativar o fornecedor.",
+                                      variant: "destructive"
+                                    })
+                                  }
+                                }}
+                              >
                                 <Power className="w-4 h-4 mr-2" />
                                 Desativar
                               </DropdownMenuItem>

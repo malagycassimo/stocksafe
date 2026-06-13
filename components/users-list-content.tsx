@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useMemo } from "react"
 import Link from "next/link"
 import { Search, Download, Plus, MoreVertical, Edit, Eye, Key, Ban, Trash2, Clock } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -21,49 +21,7 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useToast } from "@/hooks/use-toast"
-
-const mockUsers = [
-  {
-    id: "1",
-    name: "João Silva",
-    email: "joao.silva@stocksafe.com",
-    profile: "ADMIN",
-    department: "TI",
-    lastAccess: "2025-01-15T10:30:00",
-    status: true,
-    avatar: "",
-  },
-  {
-    id: "2",
-    name: "Maria Santos",
-    email: "maria.santos@stocksafe.com",
-    profile: "COMPRAS",
-    department: "Compras",
-    lastAccess: "2025-01-15T09:15:00",
-    status: true,
-    avatar: "",
-  },
-  {
-    id: "3",
-    name: "Pedro Costa",
-    email: "pedro.costa@stocksafe.com",
-    profile: "RECEBIMENTO",
-    department: "Armazém",
-    lastAccess: "2025-01-14T16:45:00",
-    status: true,
-    avatar: "",
-  },
-  {
-    id: "4",
-    name: "Ana Oliveira",
-    email: "ana.oliveira@stocksafe.com",
-    profile: "QA",
-    department: "Qualidade",
-    lastAccess: "2025-01-15T08:00:00",
-    status: false,
-    avatar: "",
-  },
-]
+import { usuarioService } from "@/app/services/usuarioService"
 
 const profileColors: Record<string, string> = {
   ADMIN: "bg-purple-100 text-purple-800",
@@ -74,15 +32,45 @@ const profileColors: Record<string, string> = {
   FORNECEDOR: "bg-yellow-100 text-yellow-800",
 }
 
+const mockUsersFallback = [
+  {
+    id: "1",
+    name: "João Silva (Fallback)",
+    email: "joao.silva@stocksafe.com",
+    profile: "ADMIN",
+    department: "TI",
+    lastAccess: new Date().toISOString(),
+    status: true,
+    avatar: "",
+  }
+]
+
 export function UsersListContent() {
   const { toast } = useToast()
+  const [users, setUsers] = useState<any[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [profileFilter, setProfileFilter] = useState("Todos")
   const [statusFilter, setStatusFilter] = useState("Todos")
   const [showUserModal, setShowUserModal] = useState(false)
   const [editingUser, setEditingUser] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  // Form values
+  const [formValues, setFormValues] = useState({
+    nome_completo: "",
+    email: "",
+    telefone: "",
+    departamento: "",
+    cargo: "",
+    perfil: "REQUISITANTE" as 'REQUISITANTE' | 'COMPRAS' | 'RECEBIMENTO' | 'QA' | 'ADMIN',
+    senha: "",
+    confirmarSenha: "",
+    status_ativo: true,
+    notificacao_email: true,
+  })
 
   const getInitials = (name: string) => {
+    if (!name) return "US"
     return name
       .split(" ")
       .map((n) => n[0])
@@ -92,6 +80,7 @@ export function UsersListContent() {
   }
 
   const getRelativeTime = (dateString: string) => {
+    if (!dateString) return "sem registro"
     const date = new Date(dateString)
     const now = new Date()
     const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60))
@@ -102,11 +91,100 @@ export function UsersListContent() {
     return `há ${diffInDays} ${diffInDays === 1 ? "dia" : "dias"}`
   }
 
-  const handleToggleStatus = (userId: string, currentStatus: boolean) => {
-    toast({
-      title: currentStatus ? "Usuário desativado" : "Usuário ativado",
-      description: "O status do usuário foi atualizado com sucesso.",
-    })
+  // Carregar usuários da API
+  const fetchUsers = async () => {
+    try {
+      setIsLoading(true)
+      const data = await usuarioService.listarTodos()
+      if (data && data.length > 0) {
+        const mapped = data.map((u: any) => {
+          let frontendProfile = "REQUISITANTE";
+          if (u.perfil === "ADMIN") frontendProfile = "ADMIN";
+          else if (u.perfil === "COMPRAS_PROCUREMENT") frontendProfile = "COMPRAS";
+          else if (u.perfil === "RECEBIMENTO_ARMAZEM") frontendProfile = "RECEBIMENTO";
+          else if (u.perfil === "QUALIDADE_QA") frontendProfile = "QA";
+
+          return {
+            id: u.id,
+            name: u.nome || u.nome_completo || "-",
+            email: u.email,
+            profile: frontendProfile,
+            department: u.departamento || "-",
+            lastAccess: u.updatedAt || new Date().toISOString(),
+            status: u.statusAtivo ?? u.status_ativo ?? true,
+            avatar: "",
+            raw: u
+          }
+        })
+        setUsers(mapped)
+      } else {
+        setUsers([])
+      }
+    } catch (err) {
+      console.error("Erro ao carregar usuários da API, usando mockData", err)
+      setUsers(mockUsersFallback)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchUsers()
+  }, [])
+
+  // Atualizar valores de formulário ao editar/criar
+  useEffect(() => {
+    if (editingUser) {
+      const u = editingUser.raw || editingUser
+      let frontendProfile = "REQUISITANTE";
+      if (u.perfil === "ADMIN") frontendProfile = "ADMIN";
+      else if (u.perfil === "COMPRAS_PROCUREMENT" || u.perfil === "COMPRAS") frontendProfile = "COMPRAS";
+      else if (u.perfil === "RECEBIMENTO_ARMAZEM" || u.perfil === "RECEBIMENTO") frontendProfile = "RECEBIMENTO";
+      else if (u.perfil === "QUALIDADE_QA" || u.perfil === "QA") frontendProfile = "QA";
+
+      setFormValues({
+        nome_completo: u.nome || u.nome_completo || u.name || "",
+        email: u.email || "",
+        telefone: u.telefone || "",
+        departamento: u.departamento || u.department || "",
+        cargo: u.cargo || "",
+        perfil: frontendProfile as any,
+        senha: "",
+        confirmarSenha: "",
+        status_ativo: u.statusAtivo ?? u.status_ativo ?? u.status ?? true,
+        notificacao_email: u.notificaEmail ?? u.notificacao_email ?? true,
+      })
+    } else {
+      setFormValues({
+        nome_completo: "",
+        email: "",
+        telefone: "",
+        departamento: "",
+        cargo: "",
+        perfil: "REQUISITANTE",
+        senha: "",
+        confirmarSenha: "",
+        status_ativo: true,
+        notificacao_email: true,
+      })
+    }
+  }, [editingUser, showUserModal])
+
+  const handleToggleStatus = async (userId: string, currentStatus: boolean) => {
+    try {
+      await usuarioService.atualizar(userId, { status_ativo: !currentStatus })
+      toast({
+        title: !currentStatus ? "Usuário ativado" : "Usuário desativado",
+        description: "O status do usuário foi atualizado com sucesso.",
+      })
+      fetchUsers()
+    } catch (err) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível atualizar o status do usuário na API.",
+        variant: "destructive"
+      })
+    }
   }
 
   const handleNewUser = () => {
@@ -114,10 +192,126 @@ export function UsersListContent() {
     setShowUserModal(true)
   }
 
-  const handleEditUser = (user: any) => {
-    setEditingUser(user)
+  const handleEditUser = async (user: any) => {
+    try {
+      const fullUser = await usuarioService.buscarPorId(user.id)
+      setEditingUser({ ...user, raw: fullUser })
+    } catch (err) {
+      setEditingUser(user)
+    }
     setShowUserModal(true)
   }
+
+  const handleDeleteUser = async (userId: string) => {
+    if (!confirm("Tem certeza que deseja excluir este usuário?")) return
+    try {
+      await usuarioService.eliminar(userId)
+      toast({
+        title: "Sucesso",
+        description: "Usuário removido com sucesso."
+      })
+      fetchUsers()
+    } catch (err) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível remover o usuário.",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const handleSaveUser = async () => {
+    if (!formValues.nome_completo || !formValues.email) {
+      toast({
+        title: "Erro de validação",
+        description: "Nome Completo e Email são obrigatórios.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (!editingUser && !formValues.senha) {
+      toast({
+        title: "Erro de validação",
+        description: "A senha é obrigatória para novos usuários.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (formValues.senha && formValues.senha !== formValues.confirmarSenha) {
+      toast({
+        title: "Erro de validação",
+        description: "As senhas não coincidem.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    let backendProfile: 'ADMIN' | 'COMPRAS_PROCUREMENT' | 'RECEBIMENTO_ARMAZEM' | 'QUALIDADE_QA' | 'REQUISITANTE' = "REQUISITANTE"
+    if (formValues.perfil === "ADMIN") backendProfile = "ADMIN"
+    else if (formValues.perfil === "COMPRAS") backendProfile = "COMPRAS_PROCUREMENT"
+    else if (formValues.perfil === "RECEBIMENTO") backendProfile = "RECEBIMENTO_ARMAZEM"
+    else if (formValues.perfil === "QA") backendProfile = "QUALIDADE_QA"
+
+    const payload: any = {
+      nome_completo: formValues.nome_completo,
+      email: formValues.email,
+      telefone: formValues.telefone || null,
+      departamento: formValues.departamento || null,
+      cargo: formValues.cargo || null,
+      perfil: backendProfile,
+      status_ativo: formValues.status_ativo,
+      notificacao_email: formValues.notificacao_email,
+    }
+
+    if (formValues.senha) {
+      payload.senha = formValues.senha
+    }
+
+    try {
+      if (editingUser) {
+        await usuarioService.atualizar(editingUser.id, payload)
+        toast({
+          title: "Sucesso",
+          description: "Usuário atualizado com sucesso."
+        })
+      } else {
+        await usuarioService.criar(payload)
+        toast({
+          title: "Sucesso",
+          description: "Usuário cadastrado com sucesso."
+        })
+      }
+      setShowUserModal(false)
+      fetchUsers()
+    } catch (err: any) {
+      toast({
+        title: "Erro ao salvar",
+        description: err.response?.data?.error || "Ocorreu um erro ao salvar o usuário.",
+        variant: "destructive"
+      })
+    }
+  }
+
+  // Filter users
+  const filteredUsers = useMemo(() => {
+    return users.filter((user) => {
+      const matchesSearch =
+        user.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        user.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        user.department?.toLowerCase().includes(searchQuery.toLowerCase())
+
+      const matchesProfile = profileFilter === "Todos" || user.profile === profileFilter
+
+      const matchesStatus =
+        statusFilter === "Todos" ||
+        (statusFilter === "Ativo" && user.status) ||
+        (statusFilter === "Inativo" && !user.status)
+
+      return matchesSearch && matchesProfile && matchesStatus
+    })
+  }, [users, searchQuery, profileFilter, statusFilter])
 
   return (
     <div className="p-6">
@@ -188,11 +382,11 @@ export function UsersListContent() {
             </Select>
           </div>
 
-          <Button variant="outline">Limpar Filtros</Button>
-          <Button variant="outline" className="text-emerald-600 border-emerald-600 bg-transparent">
-            <Download className="w-4 h-4 mr-2" />
-            Exportar
-          </Button>
+          <Button variant="outline" onClick={() => {
+            setSearchQuery("")
+            setProfileFilter("Todos")
+            setStatusFilter("Todos")
+          }}>Limpar Filtros</Button>
         </div>
       </div>
 
@@ -206,78 +400,80 @@ export function UsersListContent() {
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Email</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Perfil</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Departamento</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Último Acesso</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Modificado Em</th>
                 <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Status</th>
                 <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 w-[100px]">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {mockUsers.map((user) => (
-                <tr key={user.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <Avatar>
-                        <AvatarImage src={user.avatar || "/placeholder.svg"} />
-                        <AvatarFallback className="bg-emerald-100 text-emerald-700">
-                          {getInitials(user.name)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="font-medium">{user.name}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-sm">{user.email}</td>
-                  <td className="px-4 py-3">
-                    <Badge className={profileColors[user.profile]}>{user.profile}</Badge>
-                  </td>
-                  <td className="px-4 py-3 text-sm">{user.department}</td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-2">
-                      <Clock className="w-3 h-3" />
-                      {getRelativeTime(user.lastAccess)}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <Switch checked={user.status} onCheckedChange={() => handleToggleStatus(user.id, user.status)} />
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-center gap-2">
-                      <Button variant="ghost" size="sm" onClick={() => handleEditUser(user)}>
-                        <Edit className="w-4 h-4 text-gray-600" />
-                      </Button>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreVertical className="w-4 h-4 text-gray-600" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
-                            <Eye className="w-4 h-4 mr-2" />
-                            Ver Detalhes
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Clock className="w-4 h-4 mr-2" />
-                            Ver Log de Atividades
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Key className="w-4 h-4 mr-2" />
-                            Redefinir Senha
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-orange-600">
-                            <Ban className="w-4 h-4 mr-2" />
-                            Bloquear
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-red-600">
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Excluir
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
+              {isLoading ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                    Carregando usuários...
                   </td>
                 </tr>
-              ))}
+              ) : filteredUsers.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                    Nenhum usuário encontrado.
+                  </td>
+                </tr>
+              ) : (
+                filteredUsers.map((user) => (
+                  <tr key={user.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <Avatar>
+                          <AvatarImage src={user.avatar || "/placeholder.svg"} />
+                          <AvatarFallback className="bg-emerald-100 text-emerald-700">
+                            {getInitials(user.name)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="font-medium">{user.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-sm">{user.email}</td>
+                    <td className="px-4 py-3">
+                      <Badge className={profileColors[user.profile] || "bg-gray-100 text-gray-800"}>{user.profile}</Badge>
+                    </td>
+                    <td className="px-4 py-3 text-sm">{user.department}</td>
+                    <td className="px-4 py-3 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-3 h-3" />
+                        {getRelativeTime(user.lastAccess)}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <Switch checked={user.status} onCheckedChange={() => handleToggleStatus(user.id, user.status)} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-center gap-2">
+                        <Button variant="ghost" size="sm" onClick={() => handleEditUser(user)}>
+                          <Edit className="w-4 h-4 text-gray-600" />
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreVertical className="w-4 h-4 text-gray-600" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleEditUser(user)}>
+                              <Eye className="w-4 h-4 mr-2" />
+                              Ver Detalhes
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem className="text-red-600" onClick={() => handleDeleteUser(user.id)}>
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Excluir
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -299,32 +495,56 @@ export function UsersListContent() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Nome Completo *</Label>
-                  <Input placeholder="João Silva" />
+                  <Input
+                    placeholder="João Silva"
+                    value={formValues.nome_completo}
+                    onChange={(e) => setFormValues(prev => ({ ...prev, nome_completo: e.target.value }))}
+                  />
                 </div>
                 <div>
                   <Label>Email *</Label>
-                  <Input type="email" placeholder="joao.silva@stocksafe.com" />
+                  <Input
+                    type="email"
+                    placeholder="joao.silva@stocksafe.com"
+                    value={formValues.email}
+                    onChange={(e) => setFormValues(prev => ({ ...prev, email: e.target.value }))}
+                  />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Telefone</Label>
-                  <Input placeholder="(11) 99999-9999" />
+                  <Input
+                    placeholder="(11) 99999-9999"
+                    value={formValues.telefone}
+                    onChange={(e) => setFormValues(prev => ({ ...prev, telefone: e.target.value }))}
+                  />
                 </div>
                 <div>
                   <Label>Departamento</Label>
-                  <Input placeholder="TI" />
+                  <Input
+                    placeholder="TI"
+                    value={formValues.departamento}
+                    onChange={(e) => setFormValues(prev => ({ ...prev, departamento: e.target.value }))}
+                  />
                 </div>
               </div>
               <div>
                 <Label>Cargo</Label>
-                <Input placeholder="Analista de Sistemas" />
+                <Input
+                  placeholder="Analista de Sistemas"
+                  value={formValues.cargo}
+                  onChange={(e) => setFormValues(prev => ({ ...prev, cargo: e.target.value }))}
+                />
               </div>
             </TabsContent>
             <TabsContent value="permissions" className="space-y-4 mt-4">
               <div>
                 <Label>Perfil *</Label>
-                <Select defaultValue="REQUISITANTE">
+                <Select
+                  value={formValues.perfil}
+                  onValueChange={(val) => setFormValues(prev => ({ ...prev, perfil: val as any }))}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -340,96 +560,36 @@ export function UsersListContent() {
                   Requisitante: Pode criar e visualizar suas próprias requisições
                 </p>
               </div>
-              <div className="space-y-3">
-                <Label>Permissões Customizadas</Label>
-                <div className="border rounded-lg p-4 space-y-3">
-                  <div>
-                    <div className="font-medium mb-2">Módulo Cadastros</div>
-                    <div className="space-y-2 pl-4">
-                      <div className="flex items-center gap-2">
-                        <Checkbox id="cadastros-view" />
-                        <label htmlFor="cadastros-view" className="text-sm">
-                          Visualizar
-                        </label>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Checkbox id="cadastros-create" />
-                        <label htmlFor="cadastros-create" className="text-sm">
-                          Criar
-                        </label>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Checkbox id="cadastros-edit" />
-                        <label htmlFor="cadastros-edit" className="text-sm">
-                          Editar
-                        </label>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Checkbox id="cadastros-delete" />
-                        <label htmlFor="cadastros-delete" className="text-sm">
-                          Excluir
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-                  <div>
-                    <div className="font-medium mb-2">Módulo Requisições</div>
-                    <div className="space-y-2 pl-4">
-                      <div className="flex items-center gap-2">
-                        <Checkbox id="req-view" defaultChecked />
-                        <label htmlFor="req-view" className="text-sm">
-                          Visualizar
-                        </label>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Checkbox id="req-create" defaultChecked />
-                        <label htmlFor="req-create" className="text-sm">
-                          Criar
-                        </label>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Checkbox id="req-approve" />
-                        <label htmlFor="req-approve" className="text-sm">
-                          Aprovar
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
             </TabsContent>
             <TabsContent value="settings" className="space-y-4 mt-4">
-              {!editingUser && (
-                <div className="space-y-2">
-                  <Label>Senha *</Label>
-                  <Input type="password" placeholder="••••••••" />
-                  <Input type="password" placeholder="Confirmar senha" />
-                </div>
-              )}
-              <div className="flex items-center justify-between">
-                <Label>Forçar troca de senha no primeiro login</Label>
-                <Switch />
+              <div className="space-y-2">
+                <Label>{editingUser ? "Nova Senha (deixe em branco para manter a atual)" : "Senha *"}</Label>
+                <Input
+                  type="password"
+                  placeholder="••••••••"
+                  value={formValues.senha}
+                  onChange={(e) => setFormValues(prev => ({ ...prev, senha: e.target.value }))}
+                />
+                <Input
+                  type="password"
+                  placeholder="Confirmar senha"
+                  value={formValues.confirmarSenha}
+                  onChange={(e) => setFormValues(prev => ({ ...prev, confirmarSenha: e.target.value }))}
+                />
               </div>
               <div className="flex items-center justify-between">
                 <Label>Status Ativo</Label>
-                <Switch defaultChecked />
+                <Switch
+                  checked={formValues.status_ativo}
+                  onCheckedChange={(checked) => setFormValues(prev => ({ ...prev, status_ativo: checked }))}
+                />
               </div>
-              <div>
-                <Label>Notificações</Label>
-                <div className="space-y-2 mt-2">
-                  <div className="flex items-center gap-2">
-                    <Checkbox id="notif-email" defaultChecked />
-                    <label htmlFor="notif-email" className="text-sm">
-                      Email
-                    </label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Checkbox id="notif-push" />
-                    <label htmlFor="notif-push" className="text-sm">
-                      Push no navegador
-                    </label>
-                  </div>
-                </div>
+              <div className="flex items-center justify-between">
+                <Label>Notificações por Email</Label>
+                <Switch
+                  checked={formValues.notificacao_email}
+                  onCheckedChange={(checked) => setFormValues(prev => ({ ...prev, notificacao_email: checked }))}
+                />
               </div>
             </TabsContent>
           </Tabs>
@@ -437,7 +597,9 @@ export function UsersListContent() {
             <Button variant="outline" onClick={() => setShowUserModal(false)}>
               Cancelar
             </Button>
-            <Button className="bg-emerald-600 hover:bg-emerald-700">Salvar Usuário</Button>
+            <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={handleSaveUser}>
+              {editingUser ? "Atualizar Usuário" : "Salvar Usuário"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

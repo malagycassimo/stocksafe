@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
@@ -35,51 +35,11 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog"
-
-// Mock data
-const mockProducts = [
-  {
-    id: "1",
-    sku: "FRS-045",
-    description: "Filé de Frango Congelado - 1kg",
-    category: "Congelado",
-    unit: "kg",
-    hasLotControl: true,
-    shelfLife: 90,
-    currentStock: 500,
-  },
-  {
-    id: "2",
-    sku: "ALM-001",
-    description: "Arroz Branco Tipo 1 - Pacote 5kg",
-    category: "Seco",
-    unit: "kg",
-    hasLotControl: true,
-    shelfLife: 365,
-    currentStock: 1200,
-  },
-  {
-    id: "3",
-    sku: "BEB-120",
-    description: "Suco de Laranja Natural - 1L",
-    category: "Bebidas",
-    unit: "L",
-    hasLotControl: true,
-    shelfLife: 30,
-    currentStock: 300,
-  },
-]
-
-const mockLots = [
-  { lot: "LOT2025-001", expiryDate: "2025-02-05", quantity: 500, location: "ARM01 > ZF > CA > P01" },
-  { lot: "LOT2025-023", expiryDate: "2025-04-15", quantity: 1200, location: "ARM01 > ZS > CB > P05" },
-]
-
-const mockSuppliers = [
-  { id: "1", name: "Frigorífico Premium" },
-  { id: "2", name: "Distribuidora Alimentos" },
-  { id: "3", name: "Laticínios Premium" },
-]
+import { api } from "@/app/services/api"
+import { produtoService } from "@/app/services/produtoService"
+import { estoqueService } from "@/app/services/estoqueService"
+import { useAuth } from "@/hooks/useAuth"
+import { useToast } from "@/hooks/use-toast"
 
 const movementTypes = [
   {
@@ -182,10 +142,34 @@ const transferReasons = ["Reposição", "Reorganização", "Otimização de Espa
 
 const returnReasons = ["Não Conformidade", "Recall", "Acordo Comercial", "Produto Errado", "Outro"]
 
+function planificarLocais(arvore: any[], prefixo = ""): any[] {
+  let resultado: any[] = []
+  for (const loc of arvore) {
+    const nomeCompleto = prefixo ? `${prefixo} > ${loc.codigo}` : loc.codigo
+    resultado.push({
+      id: loc.id,
+      codigo: loc.codigo,
+      nomeCompleto: nomeCompleto,
+    })
+    if (loc.sublocais && loc.sublocais.length > 0) {
+      resultado.push(...planificarLocais(loc.sublocais, nomeCompleto))
+    }
+  }
+  return resultado
+}
+
 export function NewManualMovementContent() {
   const router = useRouter()
+  const { user } = useAuth()
+  const { toast } = useToast()
+
+  const [products, setProducts] = useState<any[]>([])
+  const [locais, setLocais] = useState<any[]>([])
+  const [suppliers, setSuppliers] = useState<any[]>([])
+  const [lotesDisponiveis, setLotesDisponiveis] = useState<any[]>([])
+
   const [movementType, setMovementType] = useState("")
-  const [selectedProduct, setSelectedProduct] = useState<typeof mockProducts[0] | null>(null)
+  const [selectedProduct, setSelectedProduct] = useState<any | null>(null)
   const [quantity, setQuantity] = useState("")
   const [lot, setLot] = useState("")
   const [expiryDate, setExpiryDate] = useState("")
@@ -209,6 +193,49 @@ export function NewManualMovementContent() {
   const [unitValue, setUnitValue] = useState("")
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [confirmed, setConfirmed] = useState(false)
+  const [loading, setLoading] = useState(false)
+
+  // Carregar produtos, locais e fornecedores do backend
+  useEffect(() => {
+    async function carregarDados() {
+      try {
+        const [prodList, locTree, supList] = await Promise.all([
+          produtoService.listarTodos(),
+          api.get("/locais"),
+          api.get("/fornecedores"),
+        ])
+        setProducts(prodList)
+        setLocais(planificarLocais(locTree.data))
+        setSuppliers(supList.data)
+      } catch (err: any) {
+        console.error("Erro ao carregar dados do backend:", err)
+        toast({
+          title: "Erro ao carregar dados",
+          description: "Ocorreu um problema ao comunicar com o servidor.",
+          variant: "destructive",
+        })
+      }
+    }
+    carregarDados()
+  }, [toast])
+
+  // Buscar lotes de um produto específico ao alterar o produto
+  useEffect(() => {
+    async function carregarLotesDoProduto() {
+      if (!selectedProduct) {
+        setLotesDisponiveis([])
+        return
+      }
+      try {
+        // Obter os lotes disponíveis no estoque filtrando pelo ID do produto
+        const list = await estoqueService.listar({ search: selectedProduct.sku })
+        setLotesDisponiveis(list)
+      } catch (err) {
+        console.error("Erro ao carregar lotes do produto:", err)
+      }
+    }
+    carregarLotesDoProduto()
+  }, [selectedProduct])
 
   const getReasonOptions = () => {
     switch (movementType) {
@@ -239,19 +266,67 @@ export function NewManualMovementContent() {
   const handleSubmit = () => {
     // Validate form
     if (!movementType || !selectedProduct || !quantity || !reason || justification.length < 20) {
-      alert("Por favor, preencha todos os campos obrigatórios")
+      toast({
+        title: "Campos obrigatórios",
+        description: "Por favor, preencha todos os campos e certifique-se de que a justificativa possui pelo menos 20 caracteres.",
+        variant: "destructive",
+      })
       return
     }
 
     setShowConfirmModal(true)
   }
 
-  const handleConfirm = () => {
-    // Here would be the API call to save the movement
-    console.log("Movement confirmed")
-    setShowConfirmModal(false)
-    router.push("/estoque/movimentacoes")
+
+  const handleConfirm = async () => {
+    try {
+      setLoading(true)
+      if (movementType === "entry" || movementType === "adjustment_positive") {
+        const finalLocalId = movementType === "entry" ? destinationLocation : adjustmentLocation
+        if (!finalLocalId) {
+          toast({
+            title: "Erro de validação",
+            description: "Por favor selecione a localização de destino.",
+            variant: "destructive",
+          })
+          return
+        }
+        await estoqueService.registarEntrada({
+          produto_id: selectedProduct.id,
+          codigo_lote: lot,
+          data_validade: expiryDate,
+          local_id: finalLocalId,
+          quantidade: parseFloat(quantity),
+          valor_unitario: parseFloat(unitValue) || 0,
+          usuario_id: user?.id || "",
+        })
+      } else {
+        await estoqueService.registarSaidaFEFO({
+          produto_id: selectedProduct.id,
+          quantidade_solicitada: parseFloat(quantity),
+          justificativa: `${reason} - ${justification}`,
+          usuario_id: user?.id || "",
+        })
+      }
+
+      toast({
+        title: "Sucesso!",
+        description: "Movimentação manual registrada com sucesso.",
+      })
+      setShowConfirmModal(false)
+      router.push("/estoque/consultar")
+    } catch (err: any) {
+      console.error(err)
+      toast({
+        title: "Erro ao registrar movimentação",
+        description: err.response?.data?.error || "Ocorreu um erro ao comunicar com o servidor.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
   }
+
 
   const requiresApproval = () => {
     if (movementType === "disposal") return true
@@ -336,23 +411,25 @@ export function NewManualMovementContent() {
                   <Select
                     value={selectedProduct?.id || ""}
                     onValueChange={(value) => {
-                      const product = mockProducts.find((p) => p.id === value)
+                      const product = products.find((p) => p.id === value)
                       setSelectedProduct(product || null)
+                      setLot("")
+                      setExpiryDate("")
                     }}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Buscar por SKU ou descrição" />
                     </SelectTrigger>
                     <SelectContent>
-                      {mockProducts.map((product) => (
+                      {products.map((product) => (
                         <SelectItem key={product.id} value={product.id}>
                           <div className="flex items-center gap-2">
                             <Package className="w-4 h-4" />
                             <span className="font-mono">{product.sku}</span>
                             <span>-</span>
-                            <span>{product.description}</span>
+                            <span>{product.descricao}</span>
                             <Badge variant="outline" className="ml-2">
-                              {product.category}
+                              {product.categoria}
                             </Badge>
                           </div>
                         </SelectItem>
@@ -366,20 +443,20 @@ export function NewManualMovementContent() {
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                       <div>
                         <Label className="text-xs">Categoria</Label>
-                        <div className="font-medium">{selectedProduct.category}</div>
+                        <div className="font-medium">{selectedProduct.categoria}</div>
                       </div>
                       <div>
                         <Label className="text-xs">Unidade</Label>
-                        <div className="font-medium">{selectedProduct.unit}</div>
+                        <div className="font-medium">{selectedProduct.unidade_medida}</div>
                       </div>
                       <div>
                         <Label className="text-xs">Controle de Lote</Label>
-                        <div className="font-medium">{selectedProduct.hasLotControl ? "Sim" : "Não"}</div>
+                        <div className="font-medium">{selectedProduct.controle_lote ? "Sim" : "Não"}</div>
                       </div>
                       <div>
                         <Label className="text-xs">Estoque Atual</Label>
                         <div className="font-medium">
-                          {selectedProduct.currentStock} {selectedProduct.unit}
+                          {lotesDisponiveis.reduce((acc, curr) => acc + curr.quantidade, 0)} {selectedProduct.unidade_medida}
                         </div>
                       </div>
                     </div>
@@ -400,37 +477,46 @@ export function NewManualMovementContent() {
                     />
                     {selectedProduct && (
                       <div className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-                        {selectedProduct.unit}
+                        {selectedProduct.unidade_medida}
                       </div>
                     )}
                   </div>
                   {selectedProduct && (movementType === "exit" || movementType === "adjustment_negative") && (
                     <p className="text-xs text-muted-foreground mt-1">
-                      Estoque disponível: {selectedProduct.currentStock} {selectedProduct.unit}
+                      Estoque disponível: {lotesDisponiveis.reduce((acc, curr) => acc + curr.quantidade, 0)} {selectedProduct.unidade_medida}
                     </p>
                   )}
                 </div>
 
                 {/* Lot and Expiry (conditional) */}
-                {selectedProduct?.hasLotControl && (
+                {selectedProduct?.controle_lote && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <Label>Lote {selectedProduct.hasLotControl && "*"}</Label>
+                      <Label>Lote *</Label>
                       {movementType === "entry" || movementType === "adjustment_positive" ? (
                         <Input placeholder="Ex: L2025-001" value={lot} onChange={(e) => setLot(e.target.value)} />
                       ) : (
-                        <Select value={lot} onValueChange={setLot}>
+                        <Select
+                          value={lot}
+                          onValueChange={(val) => {
+                            setLot(val)
+                            const selectedLotItem = lotesDisponiveis.find((l) => l.lote === val)
+                            if (selectedLotItem) {
+                              setExpiryDate(new Date(selectedLotItem.validade).toISOString().split("T")[0])
+                            }
+                          }}
+                        >
                           <SelectTrigger>
                             <SelectValue placeholder="Selecionar lote disponível" />
                           </SelectTrigger>
                           <SelectContent>
-                            {mockLots.map((lotItem) => (
-                              <SelectItem key={lotItem.lot} value={lotItem.lot}>
-                                <div className="flex flex-col">
-                                  <span className="font-mono">{lotItem.lot}</span>
+                            {lotesDisponiveis.map((lotItem) => (
+                              <SelectItem key={lotItem.id} value={lotItem.lote}>
+                                <div className="flex flex-col text-left">
+                                  <span className="font-mono font-medium">{lotItem.lote}</span>
                                   <span className="text-xs text-muted-foreground">
-                                    Val: {new Date(lotItem.expiryDate).toLocaleDateString("pt-BR")} | Qtd:{" "}
-                                    {lotItem.quantity} | {lotItem.location}
+                                    Val: {new Date(lotItem.validade).toLocaleDateString("pt-BR")} | Qtd:{" "}
+                                    {lotItem.quantidade} | Local: {lotItem.local_codigo}
                                   </span>
                                 </div>
                               </SelectItem>
@@ -441,7 +527,7 @@ export function NewManualMovementContent() {
                     </div>
 
                     <div>
-                      <Label>Validade {selectedProduct.hasLotControl && "*"}</Label>
+                      <Label>Validade *</Label>
                       {movementType === "entry" || movementType === "adjustment_positive" ? (
                         <Input
                           type="date"
@@ -450,7 +536,7 @@ export function NewManualMovementContent() {
                           min={new Date().toISOString().split("T")[0]}
                         />
                       ) : (
-                        <Input value={expiryDate} disabled className="bg-gray-100" />
+                        <Input value={expiryDate ? new Date(expiryDate).toLocaleDateString("pt-BR") : ""} disabled className="bg-gray-100" />
                       )}
                     </div>
                   </div>
@@ -458,6 +544,7 @@ export function NewManualMovementContent() {
               </div>
             </CardContent>
           </Card>
+
 
           {/* Origin and Destination */}
           <Card>
@@ -495,9 +582,9 @@ export function NewManualMovementContent() {
                             <SelectValue placeholder="Selecionar fornecedor" />
                           </SelectTrigger>
                           <SelectContent>
-                            {mockSuppliers.map((supplier) => (
+                            {suppliers.map((supplier) => (
                               <SelectItem key={supplier.id} value={supplier.id}>
-                                {supplier.name}
+                                {supplier.nome_fantasia || supplier.razao_social}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -523,9 +610,11 @@ export function NewManualMovementContent() {
                           <SelectValue placeholder="Selecionar local" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="loc1">ARM01 &gt; ZF &gt; CA &gt; P01</SelectItem>
-                          <SelectItem value="loc2">ARM01 &gt; ZS &gt; CB &gt; P05</SelectItem>
-                          <SelectItem value="loc3">ARM02 &gt; ZF &gt; CA &gt; P01</SelectItem>
+                          {locais.map((loc) => (
+                            <SelectItem key={loc.id} value={loc.id}>
+                              {loc.nomeCompleto}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -542,9 +631,11 @@ export function NewManualMovementContent() {
                           <SelectValue placeholder="Selecionar local" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="loc1">ARM01 &gt; ZF &gt; CA &gt; P01</SelectItem>
-                          <SelectItem value="loc2">ARM01 &gt; ZS &gt; CB &gt; P05</SelectItem>
-                          <SelectItem value="loc3">ARM02 &gt; ZF &gt; CA &gt; P01</SelectItem>
+                          {locais.map((loc) => (
+                            <SelectItem key={loc.id} value={loc.id}>
+                              {loc.nomeCompleto}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -625,9 +716,11 @@ export function NewManualMovementContent() {
                           <SelectValue placeholder="Selecionar local" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="loc1">ARM01 &gt; ZF &gt; CA &gt; P01</SelectItem>
-                          <SelectItem value="loc2">ARM01 &gt; ZS &gt; CB &gt; P05</SelectItem>
-                          <SelectItem value="loc3">ARM02 &gt; ZF &gt; CA &gt; P01</SelectItem>
+                          {locais.map((loc) => (
+                            <SelectItem key={loc.id} value={loc.id}>
+                              {loc.nomeCompleto}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -639,9 +732,11 @@ export function NewManualMovementContent() {
                           <SelectValue placeholder="Selecionar local" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="loc1">ARM01 &gt; ZF &gt; CA &gt; P01</SelectItem>
-                          <SelectItem value="loc2">ARM01 &gt; ZS &gt; CB &gt; P05</SelectItem>
-                          <SelectItem value="loc3">ARM02 &gt; ZF &gt; CA &gt; P01</SelectItem>
+                          {locais.map((loc) => (
+                            <SelectItem key={loc.id} value={loc.id}>
+                              {loc.nomeCompleto}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -659,9 +754,11 @@ export function NewManualMovementContent() {
                         <SelectValue placeholder="Selecionar local" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="loc1">ARM01 &gt; ZF &gt; CA &gt; P01</SelectItem>
-                        <SelectItem value="loc2">ARM01 &gt; ZS &gt; CB &gt; P05</SelectItem>
-                        <SelectItem value="loc3">ARM02 &gt; ZF &gt; CA &gt; P01</SelectItem>
+                        {locais.map((loc) => (
+                          <SelectItem key={loc.id} value={loc.id}>
+                            {loc.nomeCompleto}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -677,9 +774,11 @@ export function NewManualMovementContent() {
                           <SelectValue placeholder="Selecionar local" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="loc1">ARM01 &gt; ZF &gt; CA &gt; P01</SelectItem>
-                          <SelectItem value="loc2">ARM01 &gt; ZS &gt; CB &gt; P05</SelectItem>
-                          <SelectItem value="loc3">ARM02 &gt; ZF &gt; CA &gt; P01</SelectItem>
+                          {locais.map((loc) => (
+                            <SelectItem key={loc.id} value={loc.id}>
+                              {loc.nomeCompleto}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -691,9 +790,9 @@ export function NewManualMovementContent() {
                           <SelectValue placeholder="Selecionar fornecedor" />
                         </SelectTrigger>
                         <SelectContent>
-                          {mockSuppliers.map((supplier) => (
+                          {suppliers.map((supplier) => (
                             <SelectItem key={supplier.id} value={supplier.id}>
-                              {supplier.name}
+                              {supplier.nome_fantasia || supplier.razao_social}
                             </SelectItem>
                           ))}
                         </SelectContent>

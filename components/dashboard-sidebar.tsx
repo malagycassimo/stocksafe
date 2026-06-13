@@ -13,6 +13,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { getSidebarConfig } from "@/lib/sidebar-config"
+import { useAuth } from "@/hooks/useAuth"
 
 interface DashboardSidebarProps {
   isCollapsed: boolean
@@ -33,6 +34,9 @@ export function DashboardSidebar({ isCollapsed, userProfile }: DashboardSidebarP
   const [expandedItems, setExpandedItems] = useState<string[]>(["Dashboard"])
   const [profile, setProfile] = useState<string>(userProfile)
 
+  const { user } = useAuth()
+  const perfilAtivo = user?.perfil || userProfile || "REQUISITANTE"
+
   // Read profile from localStorage on mount
   useEffect(() => {
     const storedProfile = localStorage.getItem("userProfile")
@@ -42,7 +46,7 @@ export function DashboardSidebar({ isCollapsed, userProfile }: DashboardSidebarP
   }, [])
 
   // Get menu items based on profile
-  const menuItems = getSidebarConfig(profile).items
+  const menuItems = getSidebarConfig(perfilAtivo).items
 
   const toggleExpanded = (label: string) => {
     setExpandedItems((prev) => (prev.includes(label) ? prev.filter((item) => item !== label) : [...prev, label]))

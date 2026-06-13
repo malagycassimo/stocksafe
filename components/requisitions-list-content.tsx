@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
-import { Search, Download, Plus, MoreVertical, Eye, Edit, Copy, Printer, XIcon, Clock, AlertCircle } from "lucide-react"
+import { Search, Download, Plus, MoreVertical, Eye, Edit, Copy, Printer, XIcon, Clock, AlertCircle, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -16,96 +16,138 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { requisicaoService, RequisicaoData } from "@/app/services/requisicaoService"
 
-const mockRequisitions = [
-  {
-    id: "RI-2025-001",
-    createdAt: "2025-01-15",
-    requester: "João Silva",
-    department: "Cozinha",
-    neededDate: "2025-01-20",
-    itemsCount: 5,
-    priority: "Normal",
-    status: "Aprovada",
-  },
-  {
-    id: "RI-2025-002",
-    createdAt: "2025-01-14",
-    requester: "Maria Santos",
-    department: "Bar",
-    neededDate: "2025-01-16",
-    itemsCount: 3,
-    priority: "Urgente",
-    status: "Em Compras",
-  },
-  {
-    id: "RI-2025-003",
-    createdAt: "2025-01-14",
-    requester: "Pedro Costa",
-    department: "Limpeza",
-    neededDate: "2025-01-25",
-    itemsCount: 8,
-    priority: "Baixa",
-    status: "Submetida",
-  },
-  {
-    id: "RI-2025-004",
-    createdAt: "2025-01-13",
-    requester: "Ana Oliveira",
-    department: "Cozinha",
-    neededDate: "2025-01-15",
-    itemsCount: 2,
-    priority: "Alta",
-    status: "Rejeitada",
-  },
-  {
-    id: "RI-2025-005",
-    createdAt: "2025-01-13",
-    requester: "João Silva",
-    department: "Cozinha",
-    neededDate: "2025-01-30",
-    itemsCount: 4,
-    priority: "Normal",
-    status: "Rascunho",
-  },
-]
+const statusMap: Record<string, string> = {
+  DRAFT: "Rascunho",
+  PENDING: "Submetida",
+  APPROVED: "Aprovada",
+  REJECTED: "Rejeitada",
+  FULFILLED: "Concluída",
+}
 
 const statusColors: Record<string, string> = {
-  Rascunho: "bg-gray-100 text-gray-800",
-  Submetida: "bg-blue-100 text-blue-800",
-  Aprovada: "bg-green-100 text-green-800",
-  "Em Compras": "bg-orange-100 text-orange-800",
-  Concluída: "bg-emerald-100 text-emerald-800",
-  Rejeitada: "bg-red-100 text-red-800",
+  DRAFT: "bg-gray-100 text-gray-800",
+  PENDING: "bg-blue-100 text-blue-800",
+  APPROVED: "bg-green-100 text-green-800",
+  REJECTED: "bg-red-100 text-red-800",
+  FULFILLED: "bg-emerald-100 text-emerald-800",
+}
+
+const priorityMap: Record<string, string> = {
+  BAIXA: "Baixa",
+  NORMAL: "Normal",
+  ALTA: "Alta",
+  URGENTE: "Urgente",
 }
 
 const priorityColors: Record<string, string> = {
-  Baixa: "bg-gray-100 text-gray-800",
-  Normal: "bg-blue-100 text-blue-800",
-  Alta: "bg-orange-100 text-orange-800",
-  Urgente: "bg-red-100 text-red-800",
+  BAIXA: "bg-gray-100 text-gray-800",
+  NORMAL: "bg-blue-100 text-blue-800",
+  ALTA: "bg-orange-100 text-orange-800",
+  URGENTE: "bg-red-100 text-red-800",
 }
 
 export function RequisitionsListContent() {
+  const [requisitions, setRequisitions] = useState<RequisicaoData[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("Todas")
   const [priorityFilter, setPriorityFilter] = useState("Todas")
   const [activeTab, setActiveTab] = useState("Todas")
 
-  const getDaysUntil = (dateString: string) => {
+  const fetchRequisitions = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const data = await requisicaoService.listarTodas()
+      setRequisitions(data)
+    } catch (err: any) {
+      console.error("Erro ao buscar requisições:", err)
+      setError("Falha ao carregar a lista de requisições do servidor.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchRequisitions()
+  }, [])
+
+  const getDaysUntil = (dateString?: string) => {
+    if (!dateString) return 999
     const date = new Date(dateString)
     const now = new Date()
     const diffInDays = Math.ceil((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
     return diffInDays
   }
 
-  const getRowClassName = (neededDate: string, status: string) => {
-    if (status === "Concluída" || status === "Rejeitada") return ""
+  const getRowClassName = (neededDate?: string, status?: string) => {
+    if (status === "FULFILLED" || status === "REJECTED") return ""
+    if (!neededDate) return ""
     const daysUntil = getDaysUntil(neededDate)
     if (daysUntil < 0) return "bg-red-50"
     if (daysUntil <= 3) return "bg-yellow-50"
     return ""
   }
+
+  const handleClearFilters = () => {
+    setSearchQuery("")
+    setStatusFilter("Todas")
+    setPriorityFilter("Todas")
+    setActiveTab("Todas")
+  }
+
+  // Reactive filters
+  const filteredRequisitions = requisitions.filter((req) => {
+    // Tab Filter
+    if (activeTab !== "Todas") {
+      const mappedStatus = statusMap[req.status || ""] || req.status
+      if (mappedStatus !== activeTab) return false
+    }
+
+    // Status Dropdown Filter
+    if (statusFilter !== "Todas") {
+      const mappedStatus = statusMap[req.status || ""] || req.status
+      if (mappedStatus !== statusFilter) return false
+    }
+
+    // Priority Dropdown Filter
+    if (priorityFilter !== "Todas") {
+      const mappedPriority = priorityMap[req.prioridade || ""] || req.prioridade
+      if (mappedPriority !== priorityFilter) return false
+    }
+
+    // Search Query (Code, requester, department)
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase()
+      const matchesCode = req.codigo?.toLowerCase().includes(query) || false
+      const matchesRequester = req.solicitante_nome?.toLowerCase().includes(query) || false
+      const matchesDept = req.departamento?.toLowerCase().includes(query) || false
+      return matchesCode || matchesRequester || matchesDept
+    }
+
+    return true
+  })
+
+  // Dynamic KPIs
+  const totalCount = requisitions.length
+  const pendingCount = requisitions.filter((r) => r.status === "PENDING").length
+  
+  const approvedThisMonth = requisitions.filter((r) => {
+    if (r.status !== "APPROVED") return false
+    if (!r.createdAt) return false
+    const date = new Date(r.createdAt)
+    const now = new Date()
+    return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear()
+  }).length
+
+  const approvedCount = requisitions.filter((r) => r.status === "APPROVED").length
+  const rejectedCount = requisitions.filter((r) => r.status === "REJECTED").length
+  const totalEvaluated = approvedCount + rejectedCount
+  const approvalRate = totalEvaluated > 0 ? Math.round((approvedCount / totalEvaluated) * 100) : 0
 
   return (
     <div className="p-6">
@@ -138,7 +180,7 @@ export function RequisitionsListContent() {
             <CardTitle className="text-sm font-medium text-muted-foreground">Total de Requisições</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{mockRequisitions.length}</div>
+            <div className="text-3xl font-bold">{totalCount}</div>
           </CardContent>
         </Card>
         <Card>
@@ -147,7 +189,7 @@ export function RequisitionsListContent() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-blue-600">
-              {mockRequisitions.filter((r) => r.status === "Submetida").length}
+              {pendingCount}
             </div>
           </CardContent>
         </Card>
@@ -157,7 +199,7 @@ export function RequisitionsListContent() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-green-600">
-              {mockRequisitions.filter((r) => r.status === "Aprovada").length}
+              {approvedThisMonth}
             </div>
           </CardContent>
         </Card>
@@ -166,7 +208,7 @@ export function RequisitionsListContent() {
             <CardTitle className="text-sm font-medium text-muted-foreground">Taxa de Aprovação</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-emerald-600">85%</div>
+            <div className="text-3xl font-bold text-emerald-600">{approvalRate}%</div>
           </CardContent>
         </Card>
       </div>
@@ -179,7 +221,7 @@ export function RequisitionsListContent() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                placeholder="Buscar por número RI, produto..."
+                placeholder="Buscar por número RI, solicitante..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
@@ -198,7 +240,6 @@ export function RequisitionsListContent() {
                 <SelectItem value="Rascunho">Rascunho</SelectItem>
                 <SelectItem value="Submetida">Submetida</SelectItem>
                 <SelectItem value="Aprovada">Aprovada</SelectItem>
-                <SelectItem value="Em Compras">Em Compras</SelectItem>
                 <SelectItem value="Concluída">Concluída</SelectItem>
                 <SelectItem value="Rejeitada">Rejeitada</SelectItem>
               </SelectContent>
@@ -221,7 +262,7 @@ export function RequisitionsListContent() {
             </Select>
           </div>
 
-          <Button variant="outline">Limpar Filtros</Button>
+          <Button variant="outline" onClick={handleClearFilters}>Limpar Filtros</Button>
           <Button variant="outline" className="text-emerald-600 border-emerald-600 bg-transparent">
             <Download className="w-4 h-4 mr-2" />
             Exportar
@@ -236,105 +277,137 @@ export function RequisitionsListContent() {
           <TabsTrigger value="Rascunho">Rascunho</TabsTrigger>
           <TabsTrigger value="Submetida">Submetida</TabsTrigger>
           <TabsTrigger value="Aprovada">Aprovada</TabsTrigger>
-          <TabsTrigger value="Em Compras">Em Compras</TabsTrigger>
           <TabsTrigger value="Concluída">Concluída</TabsTrigger>
         </TabsList>
       </Tabs>
 
-      {/* Table */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Nº RI</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Data Criação</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Solicitante</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Departamento</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Data Necessária</th>
-                <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Qtd Itens</th>
-                <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Prioridade</th>
-                <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Status</th>
-                <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 w-[100px]">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {mockRequisitions.map((req) => (
-                <tr key={req.id} className={`hover:bg-gray-50 ${getRowClassName(req.neededDate, req.status)}`}>
-                  <td className="px-4 py-3">
-                    <Link
-                      href={`/requisicoes/${req.id}`}
-                      className="font-mono text-sm text-emerald-600 hover:text-emerald-700 hover:underline flex items-center gap-2"
-                    >
-                      {req.id}
-                      {req.status === "Rejeitada" && <AlertCircle className="w-4 h-4 text-red-500" />}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 text-sm">{new Date(req.createdAt).toLocaleDateString("pt-BR")}</td>
-                  <td className="px-4 py-3 text-sm">{req.requester}</td>
-                  <td className="px-4 py-3 text-sm">{req.department}</td>
-                  <td className="px-4 py-3 text-sm">
-                    <div className="flex items-center gap-2">
-                      {new Date(req.neededDate).toLocaleDateString("pt-BR")}
-                      {getDaysUntil(req.neededDate) <= 7 && req.status !== "Concluída" && (
-                        <Clock className="w-4 h-4 text-orange-500" />
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-center text-sm">{req.itemsCount}</td>
-                  <td className="px-4 py-3 text-center">
-                    <Badge className={priorityColors[req.priority]}>{req.priority}</Badge>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <Badge className={statusColors[req.status]}>{req.status}</Badge>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-center gap-2">
-                      <Link href={`/requisicoes/${req.id}`}>
-                        <Button variant="ghost" size="sm">
-                          <Eye className="w-4 h-4 text-gray-600" />
-                        </Button>
-                      </Link>
-                      {(req.status === "Rascunho" || req.status === "Submetida") && (
-                        <Link href={`/requisicoes/${req.id}/editar`}>
-                          <Button variant="ghost" size="sm">
-                            <Edit className="w-4 h-4 text-gray-600" />
-                          </Button>
-                        </Link>
-                      )}
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreVertical className="w-4 h-4 text-gray-600" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
-                            <Copy className="w-4 h-4 mr-2" />
-                            Duplicar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Printer className="w-4 h-4 mr-2" />
-                            Imprimir
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Clock className="w-4 h-4 mr-2" />
-                            Ver Histórico
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-red-600">
-                            <XIcon className="w-4 h-4 mr-2" />
-                            Cancelar RI
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* Main Content State */}
+      {error && (
+        <div className="bg-red-50 text-red-700 p-4 rounded-lg border border-red-150 flex items-center gap-3 mb-6">
+          <AlertCircle className="w-5 h-5 flex-shrink-0" />
+          <span>{error}</span>
         </div>
+      )}
+
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20 gap-3">
+            <Loader2 className="w-8 h-8 text-emerald-600 animate-spin" />
+            <span className="text-sm text-muted-foreground">Carregando requisições...</span>
+          </div>
+        ) : filteredRequisitions.length === 0 ? (
+          <div className="text-center py-20 text-muted-foreground">
+            <AlertCircle className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+            <p className="font-semibold">Nenhuma requisição encontrada</p>
+            <p className="text-sm">Tente ajustar seus filtros de busca ou crie uma nova requisição.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Nº RI</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Data Criação</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Solicitante</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Departamento</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Data Necessária</th>
+                  <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Qtd Itens</th>
+                  <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Prioridade</th>
+                  <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Status</th>
+                  <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 w-[100px]">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {filteredRequisitions.map((req) => {
+                  const displayStatus = statusMap[req.status || ""] || req.status || "Rascunho"
+                  const displayPriority = priorityMap[req.prioridade || ""] || req.prioridade || "Normal"
+                  
+                  return (
+                    <tr key={req.id} className={`hover:bg-gray-50 ${getRowClassName(req.date_necessaria, req.status)}`}>
+                      <td className="px-4 py-3">
+                        <Link
+                          href={`/requisicoes/${req.id}`}
+                          className="font-mono text-sm text-emerald-600 hover:text-emerald-700 hover:underline flex items-center gap-2"
+                        >
+                          {req.codigo}
+                          {req.status === "REJECTED" && <AlertCircle className="w-4 h-4 text-red-500" />}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {req.createdAt ? new Date(req.createdAt).toLocaleDateString("pt-BR") : "-"}
+                      </td>
+                      <td className="px-4 py-3 text-sm">{req.solicitante_nome}</td>
+                      <td className="px-4 py-3 text-sm">{req.departamento}</td>
+                      <td className="px-4 py-3 text-sm">
+                        <div className="flex items-center gap-2">
+                          {req.date_necessaria ? new Date(req.date_necessaria).toLocaleDateString("pt-BR") : "-"}
+                          {req.date_necessaria && getDaysUntil(req.date_necessaria) <= 7 && req.status !== "FULFILLED" && (
+                            <Clock className="w-4 h-4 text-orange-500" />
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-center text-sm">
+                        {(req as any)._count?.itens || req.itens?.length || 0}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <Badge className={priorityColors[req.prioridade || "NORMAL"]}>
+                          {displayPriority}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <Badge className={statusColors[req.status || "DRAFT"]}>
+                          {displayStatus}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-center gap-2">
+                          <Link href={`/requisicoes/${req.id}`}>
+                            <Button variant="ghost" size="sm">
+                              <Eye className="w-4 h-4 text-gray-600" />
+                            </Button>
+                          </Link>
+                          {(req.status === "DRAFT" || req.status === "PENDING") && (
+                            <Link href={`/requisicoes/${req.id}/editar`}>
+                              <Button variant="ghost" size="sm">
+                                <Edit className="w-4 h-4 text-gray-600" />
+                              </Button>
+                            </Link>
+                          )}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreVertical className="w-4 h-4 text-gray-600" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem>
+                                <Copy className="w-4 h-4 mr-2" />
+                                Duplicar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>
+                                <Printer className="w-4 h-4 mr-2" />
+                                Imprimir
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>
+                                <Clock className="w-4 h-4 mr-2" />
+                                Ver Histórico
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem className="text-red-600">
+                                <XIcon className="w-4 h-4 mr-2" />
+                                Cancelar RI
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   )

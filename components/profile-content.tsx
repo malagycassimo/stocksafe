@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { ChevronRight, Lock, Bell, Camera, Eye, EyeOff, Check, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,6 +12,8 @@ import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useToast } from "@/hooks/use-toast"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useAuth } from "@/hooks/useAuth"
+import { usuarioService } from "@/app/services/usuarioService"
 
 interface User {
   name: string
@@ -32,11 +34,16 @@ interface ProfileContentProps {
 export function ProfileContent({ user: initialUser }: ProfileContentProps) {
   const { toast } = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const { user: authUser } = useAuth()
 
   // Form states
   const [user, setUser] = useState(initialUser)
   const [isEditingProfile, setIsEditingProfile] = useState(false)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+
+  useEffect(() => {
+    setUser(initialUser)
+  }, [initialUser])
 
   // Password states
   const [passwordData, setPasswordData] = useState({
@@ -104,11 +111,26 @@ export function ProfileContent({ user: initialUser }: ProfileContentProps) {
         return
       }
 
-      // Mock API call
-      await new Promise((resolve) => setTimeout(resolve, 500))
+      if (authUser) {
+        await usuarioService.atualizar(authUser.id, {
+          nome_completo: user.name,
+          telefone: user.phone || undefined,
+          departamento: user.department || undefined,
+          cargo: user.position || undefined,
+        })
+
+        const updatedUser = {
+          ...authUser,
+          nome: user.name,
+          telefone: user.phone || undefined,
+          departamento: user.department || undefined,
+          cargo: user.position || undefined,
+        }
+        localStorage.setItem("user", JSON.stringify(updatedUser))
+      }
 
       toast({
-        title: "Perfil atualizado com sucesso!",
+        title: "Perfil updated com sucesso!",
         description: "Suas informações foram salvas.",
       })
       setIsEditingProfile(false)
@@ -139,10 +161,10 @@ export function ProfileContent({ user: initialUser }: ProfileContentProps) {
         return
       }
 
-      if (passwordData.newPassword.length < 8) {
+      if (passwordData.newPassword.length < 6) {
         toast({
           title: "Senha fraca",
-          description: "A nova senha deve ter no mínimo 8 caracteres",
+          description: "A nova senha deve ter no mínimo 6 caracteres",
           variant: "destructive",
         })
         return
@@ -157,8 +179,11 @@ export function ProfileContent({ user: initialUser }: ProfileContentProps) {
         return
       }
 
-      // Mock API call
-      await new Promise((resolve) => setTimeout(resolve, 500))
+      if (authUser) {
+        await usuarioService.atualizar(authUser.id, {
+          senha: passwordData.newPassword
+        })
+      }
 
       toast({
         title: "Senha alterada com sucesso!",
@@ -174,7 +199,7 @@ export function ProfileContent({ user: initialUser }: ProfileContentProps) {
     } catch (error) {
       toast({
         title: "Erro ao alterar senha",
-        description: "Senha atual incorreta ou erro no servidor",
+        description: "Não foi possível alterar a senha. Tente novamente.",
         variant: "destructive",
       })
     }

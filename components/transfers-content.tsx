@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useEffect, useMemo } from "react"
 import Link from "next/link"
 import {
   Search,
@@ -44,83 +44,11 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-
-// Mock data
-const mockTransfers = [
-  {
-    id: "TRANS-00045",
-    dateTimeRequest: "2025-01-21T14:30:00",
-    product: {
-      sku: "FRS-045",
-      description: "Filé de Frango Congelado - 1kg",
-      category: "Congelado",
-    },
-    lot: "LOT2025-001",
-    quantity: 100,
-    unit: "kg",
-    originLocation: "ARM01 > ZF > CA > P01",
-    destinationLocation: "ARM02 > ZF > CA > P01",
-    requester: { name: "Carlos Silva", avatar: "CS" },
-    status: "pending",
-    priority: "normal",
-  },
-  {
-    id: "TRANS-00044",
-    dateTimeRequest: "2025-01-21T13:00:00",
-    dateTimeTransit: "2025-01-21T13:30:00",
-    product: {
-      sku: "ALM-001",
-      description: "Arroz Branco Tipo 1 - Pacote 5kg",
-      category: "Seco",
-    },
-    lot: "LOT2025-023",
-    quantity: 200,
-    unit: "kg",
-    originLocation: "ARM01 > ZS > CB > P05",
-    destinationLocation: "ARM02 > ZS > CA > P03",
-    requester: { name: "Ana Santos", avatar: "AS" },
-    status: "in_transit",
-    priority: "high",
-  },
-  {
-    id: "TRANS-00043",
-    dateTimeRequest: "2025-01-21T10:00:00",
-    dateTimeTransit: "2025-01-21T10:30:00",
-    dateTimeCompleted: "2025-01-21T11:00:00",
-    product: {
-      sku: "BEB-120",
-      description: "Suco de Laranja Natural - 1L",
-      category: "Bebidas",
-    },
-    lot: "LOT2025-087",
-    quantity: 50,
-    unit: "L",
-    originLocation: "ARM01 > ZF > CC > P02",
-    destinationLocation: "ARM02 > ZF > CA > P01",
-    requester: { name: "Pedro Costa", avatar: "PC" },
-    receiver: { name: "Maria Oliveira", avatar: "MO" },
-    status: "completed",
-    priority: "normal",
-  },
-  {
-    id: "TRANS-00042",
-    dateTimeRequest: "2025-01-20T16:00:00",
-    product: {
-      sku: "LMP-089",
-      description: "Detergente Líquido Neutro - 500ml",
-      category: "Limpeza",
-    },
-    lot: "LOT2025-045",
-    quantity: 150,
-    unit: "un",
-    originLocation: "ARM02 > ZS > CA > P10",
-    destinationLocation: "ARM01 > ZS > CB > P08",
-    requester: { name: "João Souza", avatar: "JS" },
-    status: "cancelled",
-    priority: "normal",
-    cancelReason: "Produto não necessário no destino",
-  },
-]
+import { api } from "@/app/services/api"
+import { produtoService } from "@/app/services/produtoService"
+import { estoqueService } from "@/app/services/estoqueService"
+import { useAuth } from "@/hooks/useAuth"
+import { useToast } from "@/hooks/use-toast"
 
 const statusConfig = {
   pending: { label: "Pendente", color: "bg-yellow-100 text-yellow-800", icon: "⏳" },
@@ -135,39 +63,41 @@ const priorityConfig = {
   urgent: { label: "Urgente", color: "bg-red-100 text-red-800" },
 }
 
-// Mock products and lots
-const mockProducts = [
-  {
-    id: "1",
-    sku: "FRS-045",
-    description: "Filé de Frango Congelado - 1kg",
-    category: "Congelado",
-    unit: "kg",
-  },
-  {
-    id: "2",
-    sku: "ALM-001",
-    description: "Arroz Branco Tipo 1 - Pacote 5kg",
-    category: "Seco",
-    unit: "kg",
-  },
-]
-
-const mockLots = [
-  { lot: "LOT2025-001", expiryDate: "2025-02-05", quantity: 500, location: "ARM01 > ZF > CA > P01" },
-  { lot: "LOT2025-023", expiryDate: "2025-04-15", quantity: 1200, location: "ARM01 > ZS > CB > P05" },
-]
+function planificarLocais(arvore: any[], prefixo = ""): any[] {
+  let resultado: any[] = []
+  for (const loc of arvore) {
+    const nomeCompleto = prefixo ? `${prefixo} > ${loc.codigo}` : loc.codigo
+    resultado.push({
+      id: loc.id,
+      codigo: loc.codigo,
+      nomeCompleto: nomeCompleto,
+    })
+    if (loc.sublocais && loc.sublocais.length > 0) {
+      resultado.push(...planificarLocais(loc.sublocais, nomeCompleto))
+    }
+  }
+  return resultado
+}
 
 export function TransfersContent() {
+  const { user } = useAuth()
+  const { toast } = useToast()
+
   const [searchQuery, setSearchQuery] = useState("")
   const [dateFilter, setDateFilter] = useState("last30days")
   const [statusFilter, setStatusFilter] = useState("all")
-  const [selectedTransfer, setSelectedTransfer] = useState<typeof mockTransfers[0] | null>(null)
+  const [selectedTransfer, setSelectedTransfer] = useState<any | null>(null)
   const [showDetails, setShowDetails] = useState(false)
   const [showNewTransfer, setShowNewTransfer] = useState(false)
   const [showConfirmReceipt, setShowConfirmReceipt] = useState(false)
   const [activeTab, setActiveTab] = useState("simple")
   const [showFilters, setShowFilters] = useState(true)
+
+  // Dynamic Data Lists
+  const [products, setProducts] = useState<any[]>([])
+  const [locais, setLocais] = useState<any[]>([])
+  const [lotesDisponiveis, setLotesDisponiveis] = useState<any[]>([])
+  const [transfers, setTransfers] = useState<any[]>([])
 
   // New transfer form state
   const [selectedProduct, setSelectedProduct] = useState("")
@@ -185,9 +115,77 @@ export function TransfersContent() {
   const [damageDescription, setDamageDescription] = useState("")
   const [receiptObservations, setReceiptObservations] = useState("")
 
+  const [loading, setLoading] = useState(false)
+
+  // Initialize and load data from backend/local storage
+  useEffect(() => {
+    async function carregarDados() {
+      try {
+        const [prodList, locTree] = await Promise.all([
+          produtoService.listarTodos(),
+          api.get("/locais"),
+        ])
+        setProducts(prodList)
+        setLocais(planificarLocais(locTree.data))
+      } catch (err: any) {
+        console.error("Erro ao carregar dados do backend:", err)
+      }
+    }
+    carregarDados()
+
+    // Carregar transferências locais
+    const savedTransfers = localStorage.getItem("stocksafe_transfers")
+    if (savedTransfers) {
+      setTransfers(JSON.parse(savedTransfers))
+    } else {
+      // Mock inicial padrão se não houver no localStorage
+      const defaultTransfers = [
+        {
+          id: "TRANS-00045",
+          dateTimeRequest: new Date(Date.now() - 3600000).toISOString(),
+          product: {
+            sku: "FRS-045",
+            description: "Filé de Frango Congelado - 1kg",
+            category: "Congelado",
+          },
+          lot: "LOT2025-001",
+          quantity: 100,
+          unit: "kg",
+          originLocation: "ARM01 > ZF > CA > P01",
+          destinationLocation: "ARM02 > ZF > CA > P01",
+          requester: { name: "Carlos Silva", avatar: "CS" },
+          status: "pending",
+          priority: "normal",
+        },
+      ]
+      setTransfers(defaultTransfers)
+      localStorage.setItem("stocksafe_transfers", JSON.stringify(defaultTransfers))
+    }
+  }, [])
+
+  // Buscar lotes de um produto específico ao alterar o produto
+  useEffect(() => {
+    async function carregarLotesDoProduto() {
+      if (!selectedProduct) {
+        setLotesDisponiveis([])
+        return
+      }
+      try {
+        const prod = products.find((p) => p.id === selectedProduct)
+        if (prod) {
+          const list = await estoqueService.listar({ search: prod.sku })
+          setLotesDisponiveis(list)
+        }
+      } catch (err) {
+        console.error("Erro ao carregar lotes do produto:", err)
+      }
+    }
+    carregarLotesDoProduto()
+  }, [selectedProduct, products])
+
   // Filter transfers
   const filteredTransfers = useMemo(() => {
-    let filtered = mockTransfers
+    let filtered = transfers
 
     // Search
     if (searchQuery) {
@@ -206,7 +204,8 @@ export function TransfersContent() {
     }
 
     return filtered
-  }, [searchQuery, statusFilter])
+  }, [searchQuery, statusFilter, transfers])
+
 
   // Calculate KPIs
   const pendingCount = filteredTransfers.filter((t) => t.status === "pending").length
@@ -219,20 +218,96 @@ export function TransfersContent() {
   ).length
   const totalValue = 15420 // Mock value
 
-  const viewDetails = (transfer: typeof mockTransfers[0]) => {
+  const viewDetails = (transfer: any) => {
     setSelectedTransfer(transfer)
     setShowDetails(true)
   }
 
-  const openConfirmReceipt = (transfer: typeof mockTransfers[0]) => {
+  const openConfirmReceipt = (transfer: any) => {
     setSelectedTransfer(transfer)
     setReceivedQuantity(transfer.quantity.toString())
     setShowConfirmReceipt(true)
   }
 
   const handleNewTransfer = () => {
-    // Here would be the API call
-    console.log("New transfer created")
+    if (!selectedProduct || !selectedLot || !quantity || !originLocation || !destinationLocation || !reason) {
+      toast({
+        title: "Campos obrigatórios",
+        description: "Por favor, preencha todos os campos obrigatórios (*).",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const prod = products.find((p) => p.id === selectedProduct)
+    const lotItem = lotesDisponiveis.find((l) => l.lote === selectedLot)
+
+    if (!prod || !lotItem) {
+      toast({
+        title: "Erro de dados",
+        description: "Não foi possível identificar o produto ou o lote selecionado.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const qty = parseFloat(quantity)
+    if (isNaN(qty) || qty <= 0) {
+      toast({
+        title: "Quantidade inválida",
+        description: "A quantidade deve ser maior do que zero.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (qty > lotItem.quantidade) {
+      toast({
+        title: "Quantidade insuficiente",
+        description: `O lote possui apenas ${lotItem.quantidade} ${prod.unidade_medida} disponíveis.`,
+        variant: "destructive",
+      })
+      return
+    }
+
+    const originLoc = locais.find((l) => l.id === originLocation)
+    const destLoc = locais.find((l) => l.id === destinationLocation)
+
+    const newId = `TRANS-${Math.floor(10000 + Math.random() * 90000)}`
+    const newTransfer = {
+      id: newId,
+      dateTimeRequest: new Date().toISOString(),
+      product: {
+        id: prod.id,
+        sku: prod.sku,
+        description: prod.descricao,
+        category: prod.categoria,
+      },
+      lot: selectedLot,
+      expiryDate: lotItem.validade,
+      valorUnitario: lotItem.valor_unitario,
+      quantity: qty,
+      unit: prod.unidade_medida,
+      originLocation: originLoc?.nomeCompleto || "Origem desconhecida",
+      originLocationId: originLocation,
+      destinationLocation: destLoc?.nomeCompleto || "Destino desconhecido",
+      destinationLocationId: destinationLocation,
+      requester: { name: user?.nome || "Usuário", avatar: (user?.nome || "U").substring(0, 2).toUpperCase() },
+      status: "in_transit", // Deixar em trânsito para recebimento
+      priority: priority,
+      reason: reason,
+      observations: observations,
+    }
+
+    const updatedTransfers = [newTransfer, ...transfers]
+    setTransfers(updatedTransfers)
+    localStorage.setItem("stocksafe_transfers", JSON.stringify(updatedTransfers))
+
+    toast({
+      title: "Transferência Solicitada",
+      description: `A transferência ${newId} foi criada e está em trânsito.`,
+    })
+
     setShowNewTransfer(false)
     // Reset form
     setSelectedProduct("")
@@ -245,11 +320,87 @@ export function TransfersContent() {
     setPriority("normal")
   }
 
-  const handleConfirmReceipt = () => {
-    // Here would be the API call
-    console.log("Receipt confirmed")
-    setShowConfirmReceipt(false)
+  const handleConfirmReceipt = async () => {
+    if (!selectedTransfer) return
+
+    const qtyReceived = parseFloat(receivedQuantity)
+    if (isNaN(qtyReceived) || qtyReceived <= 0) {
+      toast({
+        title: "Quantidade inválida",
+        description: "Por favor insira uma quantidade recebida maior que zero.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (condition !== "conform" && !damageDescription) {
+      toast({
+        title: "Descrição obrigatória",
+        description: "Por favor descreva as avarias encontradas.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      setLoading(true)
+
+      // 1. Saída FEFO no produto e quantidade na origem
+      await estoqueService.registarSaidaFEFO({
+        produto_id: selectedTransfer.product.id,
+        quantidade_solicitada: qtyReceived,
+        justificativa: `Saída p/ Transferência ${selectedTransfer.id} de ${selectedTransfer.originLocation} para ${selectedTransfer.destinationLocation}`,
+        usuario_id: user?.id || "",
+      })
+
+      // 2. Entrada no local de destino
+      await estoqueService.registarEntrada({
+        produto_id: selectedTransfer.product.id,
+        codigo_lote: selectedTransfer.lot,
+        data_validade: selectedTransfer.expiryDate,
+        local_id: selectedTransfer.destinationLocationId,
+        quantidade: qtyReceived,
+        valor_unitario: selectedTransfer.valorUnitario || 0,
+        usuario_id: user?.id || "",
+      })
+
+      // 3. Atualizar localmente a transferência
+      const updatedTransfers = transfers.map((t) => {
+        if (t.id === selectedTransfer.id) {
+          return {
+            ...t,
+            status: "completed",
+            dateTimeCompleted: new Date().toISOString(),
+            receiver: { name: user?.nome || "Recebedor", avatar: (user?.nome || "R").substring(0, 2).toUpperCase() },
+            receivedQuantity: qtyReceived,
+            condition: condition,
+            damageDescription: damageDescription,
+            receiptObservations: receiptObservations,
+          }
+        }
+        return t
+      })
+
+      setTransfers(updatedTransfers)
+      localStorage.setItem("stocksafe_transfers", JSON.stringify(updatedTransfers))
+
+      toast({
+        title: "Recebimento Confirmado",
+        description: `A transferência ${selectedTransfer.id} foi concluída com sucesso e o estoque foi movimentado no backend.`,
+      })
+      setShowConfirmReceipt(false)
+    } catch (err: any) {
+      console.error(err)
+      toast({
+        title: "Erro ao confirmar recebimento",
+        description: err.response?.data?.error || "Ocorreu um erro ao atualizar o estoque no servidor.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
   }
+
 
   const clearFilters = () => {
     setSearchQuery("")
@@ -656,14 +807,18 @@ export function TransfersContent() {
             <TabsContent value="simple" className="space-y-4 mt-4">
               <div>
                 <Label>Produto *</Label>
-                <Select value={selectedProduct} onValueChange={setSelectedProduct}>
+                <Select value={selectedProduct} onValueChange={(val) => {
+                  setSelectedProduct(val)
+                  setSelectedLot("")
+                  setOriginLocation("")
+                }}>
                   <SelectTrigger>
                     <SelectValue placeholder="Buscar produto" />
                   </SelectTrigger>
                   <SelectContent>
-                    {mockProducts.map((product) => (
+                    {products.map((product) => (
                       <SelectItem key={product.id} value={product.id}>
-                        {product.sku} - {product.description}
+                        {product.sku} - {product.descricao}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -672,17 +827,26 @@ export function TransfersContent() {
 
               <div>
                 <Label>Lote *</Label>
-                <Select value={selectedLot} onValueChange={setSelectedLot}>
+                <Select
+                  value={selectedLot}
+                  onValueChange={(val) => {
+                    setSelectedLot(val)
+                    const lotItem = lotesDisponiveis.find((l) => l.lote === val)
+                    if (lotItem) {
+                      setOriginLocation(lotItem.local_id)
+                    }
+                  }}
+                >
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecionar lote disponível" />
+                    <SelectValue placeholder={selectedProduct ? "Selecionar lote disponível" : "Selecione primeiro um produto"} />
                   </SelectTrigger>
                   <SelectContent>
-                    {mockLots.map((lot) => (
-                      <SelectItem key={lot.lot} value={lot.lot}>
-                        <div className="flex flex-col">
-                          <span className="font-mono">{lot.lot}</span>
+                    {lotesDisponiveis.map((lotItem) => (
+                      <SelectItem key={lotItem.id} value={lotItem.lote}>
+                        <div className="flex flex-col text-left">
+                          <span className="font-mono font-medium">{lotItem.lote}</span>
                           <span className="text-xs text-muted-foreground">
-                            Val: {new Date(lot.expiryDate).toLocaleDateString("pt-BR")} | Qtd: {lot.quantity} | {lot.location}
+                            Val: {new Date(lotItem.validade).toLocaleDateString("pt-BR")} | Qtd: {lotItem.quantidade} | Local: {lotItem.local_codigo}
                           </span>
                         </div>
                       </SelectItem>
@@ -706,13 +870,16 @@ export function TransfersContent() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Local Origem *</Label>
-                  <Select value={originLocation} onValueChange={setOriginLocation}>
+                  <Select value={originLocation} onValueChange={setOriginLocation} disabled>
                     <SelectTrigger>
-                      <SelectValue placeholder="Selecionar local" />
+                      <SelectValue placeholder="Local de origem do lote" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="loc1">ARM01 &gt; ZF &gt; CA &gt; P01</SelectItem>
-                      <SelectItem value="loc2">ARM01 &gt; ZS &gt; CB &gt; P05</SelectItem>
+                      {locais.map((loc) => (
+                        <SelectItem key={loc.id} value={loc.id}>
+                          {loc.nomeCompleto}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -724,8 +891,11 @@ export function TransfersContent() {
                       <SelectValue placeholder="Selecionar local" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="loc3">ARM02 &gt; ZF &gt; CA &gt; P01</SelectItem>
-                      <SelectItem value="loc4">ARM02 &gt; ZS &gt; CA &gt; P03</SelectItem>
+                      {locais.map((loc) => (
+                        <SelectItem key={loc.id} value={loc.id}>
+                          {loc.nomeCompleto}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

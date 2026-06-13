@@ -12,22 +12,80 @@ import { Mail, Lock, Eye, EyeOff, Package, User } from "lucide-react";
 import { ForgotPasswordModal } from "@/components/forgot-password-modal";
 import Image from "next/image";
 import logoImage from "@/public/logo.svg";
+import { useAuth } from '@/hooks/useAuth';
 
 export default function LoginPage() {
+  // const [email, setEmail] = useState("");
+  // const [password, setPassword] = useState("");
+  // const [profile, setProfile] = useState("");
+  // const [showPassword, setShowPassword] = useState(false);
+  // const [rememberMe, setRememberMe] = useState(false);
+  // const [isModalOpen, setIsModalOpen] = useState(false);
+  // const [error, setError] = useState("");
+  // const [isLoading, setIsLoading] = useState(false);
+
+  // //me
+
+
+  // const handleSubmit = async (e: React.FormEvent) => {
+  //   e.preventDefault();
+  //   setError("");
+
+  //   if (!email || !password || !profile) {
+  //     setError("Por favor, preencha todos os campos");
+  //     return;
+  //   }
+
+  //   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  //     setError("Por favor, insira um email válido");
+  //     return;
+  //   }
+
+  //   if (password.length < 6) {
+  //     setError("A senha deve ter no mínimo 6 caracteres");
+  //     return;
+  //   }
+
+  //   setIsLoading(true);
+
+  //   try {
+  //     // Save profile to localStorage
+  //     localStorage.setItem("userProfile", profile);
+
+  //     // TODO: Implement actual login API call
+  //     // const response = await fetch('/api/auth/login', {
+  //     //   method: 'POST',
+  //     //   headers: { 'Content-Type': 'application/json' },
+  //     //   body: JSON.stringify({ email, password, rememberMe, profile })
+  //     // })
+
+  //     // Simulate API call
+  //     await new Promise((resolve) => setTimeout(resolve, 1000));
+
+  //     window.location.href = "/dashboard";
+  //   } catch (err) {
+  //     setError("Erro ao fazer login. Tente novamente.");
+  //   } finally {
+  //     setIsLoading(false);
+  //   }
+  // };
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [profile, setProfile] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+
+  // 💡 Injeta o nosso Hook Real de Autenticação (apaga o setError e setIsLoading locais)
+  const { executarLogin, isLoading, error, setError } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    if (setError) setError(""); // Limpa os erros anteriores ao submeter
 
-    if (!email || !password || !profile) {
+    // 🛡️ Validações locais de barreira no Frontend
+    if (!email || !password) {
       setError("Por favor, preencha todos os campos");
       return;
     }
@@ -42,30 +100,9 @@ export default function LoginPage() {
       return;
     }
 
-    setIsLoading(true);
+    await executarLogin(email, password);
 
-    try {
-      // Save profile to localStorage
-      localStorage.setItem("userProfile", profile);
-
-      // TODO: Implement actual login API call
-      // const response = await fetch('/api/auth/login', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ email, password, rememberMe, profile })
-      // })
-
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      window.location.href = "/dashboard";
-    } catch (err) {
-      setError("Erro ao fazer login. Tente novamente.");
-    } finally {
-      setIsLoading(false);
-    }
   };
-
   return (
     <div className="min-h-screen flex">
       {/* Left Column - Brand Section */}
@@ -155,7 +192,7 @@ export default function LoginPage() {
 
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Profile Selection */}
-              <div className="space-y-2">
+              {/* <div className="space-y-2">
                 <Label htmlFor="profile" className="text-sm font-medium">
                   Perfil de Acesso
                 </Label>
@@ -177,7 +214,7 @@ export default function LoginPage() {
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
+              </div> */}
 
               {/* Email Field */}
               <div className="space-y-2">

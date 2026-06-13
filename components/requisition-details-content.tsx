@@ -1,9 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
-import { Printer, Copy, Edit, Trash2, CheckCircle, XCircle, AlertCircle, Download, FileText } from "lucide-react"
+import { Printer, Copy, Edit, Trash2, CheckCircle, XCircle, AlertCircle, Download, FileText, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -19,95 +19,103 @@ import {
 } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { requisicaoService, RequisicaoData } from "@/app/services/requisicaoService"
+import { useAuth } from "@/hooks/useAuth"
 
-const mockRequisition = {
-  id: "RI-2025-003",
-  number: "RI-2025-003",
-  createdAt: "2025-01-14",
-  requester: { name: "Pedro Costa", initials: "PC", department: "Limpeza" },
-  costCenter: "CC-003",
-  neededDate: "2025-01-25",
-  priority: "Baixa",
-  status: "Submetida",
-  justification: "Reposição de estoque para manutenção mensal das áreas comuns",
-  items: [
-    {
-      id: "1",
-      sku: "LMP-001",
-      description: "Detergente Neutro - 5L",
-      quantity: 10,
-      unit: "UN",
-      minValidity: "80%",
-      currentStock: 5,
-      notes: "Preferência por marca X",
-    },
-    {
-      id: "2",
-      sku: "LMP-015",
-      description: "Desinfetante Multiuso - 2L",
-      quantity: 15,
-      unit: "UN",
-      minValidity: "90%",
-      currentStock: 8,
-      notes: "",
-    },
-  ],
-  attachments: [
-    { name: "Previsao_Demanda_Jan.xlsx", size: "245 KB" },
-    { name: "Orcamento_Fornecedor.pdf", size: "1.2 MB" },
-  ],
-  history: [
-    { date: "2025-01-14 09:30", user: "Pedro Costa", action: "Criou a requisição", status: "Rascunho" },
-    { date: "2025-01-14 10:15", user: "Pedro Costa", action: "Submeteu para aprovação", status: "Submetida" },
-  ],
-  relatedRfqs: [],
+const statusMap: Record<string, string> = {
+  DRAFT: "Rascunho",
+  PENDING: "Submetida",
+  APPROVED: "Aprovada",
+  REJECTED: "Rejeitada",
+  FULFILLED: "Concluída",
 }
 
 const statusColors: Record<string, string> = {
-  Rascunho: "bg-gray-100 text-gray-800",
-  Submetida: "bg-blue-100 text-blue-800",
-  Aprovada: "bg-green-100 text-green-800",
-  "Em Compras": "bg-orange-100 text-orange-800",
-  Concluída: "bg-emerald-100 text-emerald-800",
-  Rejeitada: "bg-red-100 text-red-800",
+  DRAFT: "bg-gray-100 text-gray-800",
+  PENDING: "bg-blue-100 text-blue-800",
+  APPROVED: "bg-green-100 text-green-800",
+  REJECTED: "bg-red-100 text-red-800",
+  FULFILLED: "bg-emerald-100 text-emerald-800",
+}
+
+const priorityMap: Record<string, string> = {
+  BAIXA: "Baixa",
+  NORMAL: "Normal",
+  ALTA: "Alta",
+  URGENTE: "Urgente",
 }
 
 const priorityColors: Record<string, string> = {
-  Baixa: "bg-gray-100 text-gray-800",
-  Normal: "bg-blue-100 text-blue-800",
-  Alta: "bg-orange-100 text-orange-800",
-  Urgente: "bg-red-100 text-red-800",
+  BAIXA: "bg-gray-100 text-gray-800",
+  NORMAL: "bg-blue-100 text-blue-800",
+  ALTA: "bg-orange-100 text-orange-800",
+  URGENTE: "bg-red-100 text-red-800",
 }
 
 export function RequisitionDetailsContent() {
   const params = useParams()
   const router = useRouter()
   const { toast } = useToast()
+  const { user: authUser } = useAuth()
+  
+  const id = params.id as string
+
+  const [requisition, setRequisition] = useState<RequisicaoData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [actionLoading, setActionLoading] = useState(false)
+
   const [showApproveModal, setShowApproveModal] = useState(false)
   const [showRejectModal, setShowRejectModal] = useState(false)
-  const [showAdjustModal, setShowAdjustModal] = useState(false)
   const [approvalNotes, setApprovalNotes] = useState("")
   const [rejectionReason, setRejectionReason] = useState("")
-  const [adjustmentRequest, setAdjustmentRequest] = useState("")
 
-  // Mock user profile - in real app, get from auth context
-  type UserProfile = "REQUISITANTE" | "COMPRAS" | "RECEBIMENTO" | "QA" | "ADMIN" | "GESTOR" | "FORNECEDOR"
-  const userProfile: UserProfile = "GESTOR" as UserProfile
-  const isApprover = userProfile === "GESTOR" || userProfile === "ADMIN"
-  const isCreator = true // Mock - check if current user is the creator
-  const canApprove = isApprover && mockRequisition.status === "Submetida"
-  const canEdit = isCreator && (mockRequisition.status === "Rascunho" || mockRequisition.status === "Submetida")
-
-  const handleApprove = () => {
-    toast({
-      title: "RI aprovada com sucesso!",
-      description: "O solicitante e o departamento de Compras foram notificados.",
-    })
-    setShowApproveModal(false)
-    router.push("/requisicoes")
+  const fetchRequisition = async () => {
+    if (!id) return
+    try {
+      setLoading(true)
+      setError(null)
+      const data = await requisicaoService.buscarPorId(id)
+      setRequisition(data)
+    } catch (err: any) {
+      console.error("Erro ao buscar requisição:", err)
+      setError("Falha ao carregar os detalhes da requisição.")
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handleReject = () => {
+  useEffect(() => {
+    fetchRequisition()
+  }, [id])
+
+  const handleApprove = async () => {
+    if (!requisition?.id) return
+    try {
+      setActionLoading(true)
+      await requisicaoService.avaliar(requisition.id, {
+        status: "APPROVED"
+      })
+      toast({
+        title: "RI aprovada com sucesso!",
+        description: "A requisição foi aprovada.",
+      })
+      setShowApproveModal(false)
+      fetchRequisition()
+    } catch (err: any) {
+      console.error("Erro ao aprovar:", err)
+      toast({
+        title: "Erro ao aprovar",
+        description: err.response?.data?.error || "Falha ao aprovar a requisição.",
+        variant: "destructive",
+      })
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleReject = async () => {
+    if (!requisition?.id) return
     if (!rejectionReason.trim()) {
       toast({
         title: "Motivo obrigatório",
@@ -116,29 +124,87 @@ export function RequisitionDetailsContent() {
       })
       return
     }
-    toast({
-      title: "RI rejeitada",
-      description: "O solicitante foi notificado sobre a rejeição.",
-    })
-    setShowRejectModal(false)
-    router.push("/requisicoes")
-  }
-
-  const handleRequestAdjustments = () => {
-    if (!adjustmentRequest.trim()) {
+    try {
+      setActionLoading(true)
+      await requisicaoService.avaliar(requisition.id, {
+        status: "REJECTED",
+        justificativa_negacao: rejectionReason,
+      })
       toast({
-        title: "Ajustes obrigatórios",
-        description: "Por favor, descreva os ajustes necessários.",
+        title: "RI rejeitada",
+        description: "A requisição foi rejeitada.",
+      })
+      setShowRejectModal(false)
+      fetchRequisition()
+    } catch (err: any) {
+      console.error("Erro ao rejeitar:", err)
+      toast({
+        title: "Erro ao rejeitar",
+        description: err.response?.data?.error || "Falha ao rejeitar a requisição.",
         variant: "destructive",
       })
-      return
+    } finally {
+      setActionLoading(false)
     }
-    toast({
-      title: "Ajustes solicitados",
-      description: "O solicitante foi notificado sobre os ajustes necessários.",
+  }
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-40 gap-3">
+        <Loader2 className="w-8 h-8 text-emerald-600 animate-spin" />
+        <span className="text-sm text-muted-foreground">Carregando detalhes...</span>
+      </div>
+    )
+  }
+
+  if (error || !requisition) {
+    return (
+      <div className="p-6">
+        <div className="bg-red-50 text-red-700 p-4 rounded-lg border border-red-150 flex items-center gap-3">
+          <AlertCircle className="w-5 h-5 flex-shrink-0" />
+          <span>{error || "Requisição não encontrada."}</span>
+        </div>
+        <Button variant="outline" className="mt-4" onClick={() => router.push("/requisicoes")}>
+          Voltar para Lista
+        </Button>
+      </div>
+    )
+  }
+
+  const isApprover = authUser?.perfil === "ADMIN" || authUser?.perfil === "COMPRAS_PROCUREMENT"
+  const isCreator = authUser?.id === requisition.usuario_id
+  const canApprove = isApprover && requisition.status === "PENDING"
+  const canEdit = isCreator && (requisition.status === "DRAFT" || requisition.status === "PENDING")
+
+  const displayStatus = statusMap[requisition.status || ""] || requisition.status || "Rascunho"
+  const displayPriority = priorityMap[requisition.prioridade || ""] || requisition.prioridade || "Normal"
+  const displayInitials = requisition.solicitante_nome
+    ? requisition.solicitante_nome.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
+    : "RI"
+
+  // Synthetic history log since database has no history table
+  const syntheticHistory = [
+    {
+      date: requisition.createdAt ? new Date(requisition.createdAt).toLocaleString("pt-BR") : "-",
+      user: requisition.solicitante_nome,
+      action: "Criou a requisição",
+      status: "DRAFT",
+    },
+    {
+      date: requisition.createdAt ? new Date(requisition.createdAt).toLocaleString("pt-BR") : "-",
+      user: requisition.solicitante_nome,
+      action: "Submeteu para aprovação",
+      status: "PENDING",
+    },
+  ]
+
+  if (requisition.status === "APPROVED" || requisition.status === "REJECTED") {
+    syntheticHistory.push({
+      date: requisition.updatedAt ? new Date(requisition.updatedAt).toLocaleString("pt-BR") : "-",
+      user: "Gestor do Sistema",
+      action: requisition.status === "APPROVED" ? "Aprovou a requisição" : "Rejeitou a requisição",
+      status: requisition.status,
     })
-    setShowAdjustModal(false)
-    router.push("/requisicoes")
   }
 
   return (
@@ -153,21 +219,21 @@ export function RequisitionDetailsContent() {
           Requisições
         </Link>
         {" / "}
-        <span className="text-foreground">RI #{mockRequisition.number}</span>
+        <span className="text-foreground">RI #{requisition.codigo}</span>
       </div>
 
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-emerald-700 mb-2">Requisição Interna #{mockRequisition.number}</h1>
-          <Badge className={`${statusColors[mockRequisition.status]} text-base px-4 py-1`}>
-            {mockRequisition.status}
+          <h1 className="text-3xl font-bold text-emerald-700 mb-2">Requisição Interna #{requisition.codigo}</h1>
+          <Badge className={`${statusColors[requisition.status || "DRAFT"]} text-base px-4 py-1`}>
+            {displayStatus}
           </Badge>
         </div>
         <div className="flex gap-2">
           {canEdit && (
             <>
-              <Link href={`/requisicoes/${params.id}/editar`}>
+              <Link href={`/requisicoes/${requisition.id}/editar`}>
                 <Button variant="outline">
                   <Edit className="w-4 h-4 mr-2" />
                   Editar
@@ -179,7 +245,7 @@ export function RequisitionDetailsContent() {
               </Button>
             </>
           )}
-          {mockRequisition.status === "Aprovada" && userProfile === "COMPRAS" && (
+          {requisition.status === "APPROVED" && authUser?.perfil === "COMPRAS_PROCUREMENT" && (
             <Link href="/compras/rfqs/nova">
               <Button className="bg-emerald-600 hover:bg-emerald-700">
                 <FileText className="w-4 h-4 mr-2" />
@@ -208,30 +274,30 @@ export function RequisitionDetailsContent() {
             <div className="space-y-4">
               <div>
                 <div className="text-sm text-muted-foreground mb-1">Nº RI</div>
-                <div className="font-mono font-medium">{mockRequisition.number}</div>
+                <div className="font-mono font-medium">{requisition.codigo}</div>
               </div>
               <div>
                 <div className="text-sm text-muted-foreground mb-1">Data de Criação</div>
-                <div>{new Date(mockRequisition.createdAt).toLocaleDateString("pt-BR")}</div>
+                <div>{requisition.createdAt ? new Date(requisition.createdAt).toLocaleDateString("pt-BR") : "-"}</div>
               </div>
               <div>
                 <div className="text-sm text-muted-foreground mb-1">Solicitante</div>
                 <div className="flex items-center gap-2">
                   <Avatar className="w-8 h-8">
                     <AvatarFallback className="bg-emerald-100 text-emerald-700 text-xs">
-                      {mockRequisition.requester.initials}
+                      {displayInitials}
                     </AvatarFallback>
                   </Avatar>
-                  <span>{mockRequisition.requester.name}</span>
+                  <span>{requisition.solicitante_nome}</span>
                 </div>
               </div>
               <div>
                 <div className="text-sm text-muted-foreground mb-1">Departamento</div>
-                <div>{mockRequisition.requester.department}</div>
+                <div>{requisition.departamento}</div>
               </div>
               <div>
                 <div className="text-sm text-muted-foreground mb-1">Centro de Custo</div>
-                <div>{mockRequisition.costCenter}</div>
+                <div>{requisition.centro_custo}</div>
               </div>
             </div>
             <div className="space-y-4">
@@ -239,23 +305,29 @@ export function RequisitionDetailsContent() {
                 <div className="text-sm text-muted-foreground mb-1">Data Necessária</div>
                 <div className="flex items-center gap-2">
                   <span className="font-medium">
-                    {new Date(mockRequisition.neededDate).toLocaleDateString("pt-BR")}
+                    {requisition.date_necessaria ? new Date(requisition.date_necessaria).toLocaleDateString("pt-BR") : "-"}
                   </span>
-                  {mockRequisition.priority === "Urgente" && <Badge className="bg-red-100 text-red-800">Urgente</Badge>}
+                  {requisition.prioridade === "URGENTE" && <Badge className="bg-red-100 text-red-800">Urgente</Badge>}
                 </div>
               </div>
               <div>
                 <div className="text-sm text-muted-foreground mb-1">Prioridade</div>
-                <Badge className={priorityColors[mockRequisition.priority]}>{mockRequisition.priority}</Badge>
+                <Badge className={priorityColors[requisition.prioridade || "NORMAL"]}>{displayPriority}</Badge>
               </div>
               <div>
                 <div className="text-sm text-muted-foreground mb-1">Status Atual</div>
-                <Badge className={statusColors[mockRequisition.status]}>{mockRequisition.status}</Badge>
+                <Badge className={statusColors[requisition.status || "DRAFT"]}>{displayStatus}</Badge>
               </div>
-              {mockRequisition.justification && (
+              {requisition.justificativa && (
                 <div>
                   <div className="text-sm text-muted-foreground mb-1">Justificativa</div>
-                  <div className="text-sm">{mockRequisition.justification}</div>
+                  <div className="text-sm">{requisition.justificativa}</div>
+                </div>
+              )}
+              {requisition.status === "REJECTED" && requisition.justificativa_negacao && (
+                <div className="p-3 bg-red-50 text-red-900 border border-red-200 rounded-lg">
+                  <div className="text-sm font-semibold mb-1">Justificativa da Negação</div>
+                  <div className="text-sm">{requisition.justificativa_negacao}</div>
                 </div>
               )}
             </div>
@@ -277,26 +349,29 @@ export function RequisitionDetailsContent() {
                   <th className="px-4 py-3 text-center text-sm font-semibold">Qtd Solicitada</th>
                   <th className="px-4 py-3 text-center text-sm font-semibold">Unidade</th>
                   <th className="px-4 py-3 text-center text-sm font-semibold">Validade Mín. Requerida</th>
-                  <th className="px-4 py-3 text-center text-sm font-semibold">Estoque Atual</th>
                   <th className="px-4 py-3 text-left text-sm font-semibold">Observações</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {mockRequisition.items.map((item) => (
+                {requisition.itens?.map((item) => (
                   <tr key={item.id}>
                     <td className="px-4 py-3">
-                      <div className="font-mono text-sm text-emerald-600">{item.sku}</div>
-                      <div className="text-sm">{item.description}</div>
+                      <div className="font-mono text-sm text-emerald-600">{item.produto?.sku}</div>
+                      <div className="text-sm">{item.produto?.descricao}</div>
                     </td>
-                    <td className="px-4 py-3 text-center font-medium">{item.quantity}</td>
-                    <td className="px-4 py-3 text-center text-sm">{item.unit}</td>
-                    <td className="px-4 py-3 text-center text-sm">{item.minValidity}</td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={item.currentStock < item.quantity ? "text-orange-600 font-medium" : ""}>
-                        {item.currentStock}
-                      </span>
+                    <td className="px-4 py-3 text-center font-medium">{item.quantidade}</td>
+                    <td className="px-4 py-3 text-center text-sm">{item.produto?.unidade_medida || "UN"}</td>
+                    <td className="px-4 py-3 text-center text-sm">
+                      {item.validade_min_proposta ? (
+                        <>
+                          {item.validade_min_proposta}
+                          {item.validade_min_tipo === "PERCENTAGEM" ? "%" : " dias"}
+                        </>
+                      ) : (
+                        "-"
+                      )}
                     </td>
-                    <td className="px-4 py-3 text-sm">{item.notes || "-"}</td>
+                    <td className="px-4 py-3 text-sm">{item.observacoes || "-"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -304,42 +379,15 @@ export function RequisitionDetailsContent() {
           </div>
           <div className="mt-4 flex justify-between text-sm border-t pt-4">
             <div>
-              <span className="font-medium">Total de Itens:</span> {mockRequisition.items.length}
+              <span className="font-medium">Total de Itens:</span> {requisition.itens?.length || 0}
             </div>
             <div>
               <span className="font-medium">Quantidade Total:</span>{" "}
-              {mockRequisition.items.reduce((sum, item) => sum + item.quantity, 0)} unidades
+              {requisition.itens?.reduce((sum, item) => sum + item.quantidade, 0) || 0} unidades
             </div>
           </div>
         </CardContent>
       </Card>
-
-      {/* Attachments */}
-      {mockRequisition.attachments.length > 0 && (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Anexos</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {mockRequisition.attachments.map((file, index) => (
-                <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <FileText className="w-5 h-5 text-gray-400" />
-                    <div>
-                      <div className="text-sm font-medium">{file.name}</div>
-                      <div className="text-xs text-muted-foreground">{file.size}</div>
-                    </div>
-                  </div>
-                  <Button variant="ghost" size="sm">
-                    <Download className="w-4 h-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* History Timeline */}
       <Card className="mb-6">
@@ -348,17 +396,17 @@ export function RequisitionDetailsContent() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {mockRequisition.history.map((event, index) => (
+            {syntheticHistory.map((event, index) => (
               <div key={index} className="flex gap-4">
                 <div className="flex flex-col items-center">
                   <div className="w-3 h-3 rounded-full bg-emerald-600" />
-                  {index < mockRequisition.history.length - 1 && <div className="w-0.5 h-full bg-gray-200 mt-1" />}
+                  {index < syntheticHistory.length - 1 && <div className="w-0.5 h-full bg-gray-200 mt-1" />}
                 </div>
                 <div className="flex-1 pb-4">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="font-medium">{event.action}</span>
                     <Badge className={statusColors[event.status]} variant="outline">
-                      {event.status}
+                      {statusMap[event.status] || event.status}
                     </Badge>
                   </div>
                   <div className="text-sm text-muted-foreground">
@@ -371,31 +419,22 @@ export function RequisitionDetailsContent() {
         </CardContent>
       </Card>
 
-      {/* Related RFQs/POs */}
-      {mockRequisition.relatedRfqs.length > 0 && (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>RFQs/POs Relacionados</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-sm text-muted-foreground">Nenhuma RFQ ou PO criada ainda.</div>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Approval Section */}
       {canApprove && (
         <Card className="border-emerald-200 bg-emerald-50">
           <CardHeader>
-            <CardTitle className="text-emerald-700">Aprovar Requisição</CardTitle>
+            <CardTitle className="text-emerald-700">Avaliar Requisição</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label>Observações da Aprovação (opcional)</Label>
+              <Label>Observações da Aprovação/Negação (Justificativa de negação obrigatória se rejeitada)</Label>
               <Textarea
-                placeholder="Adicione observações sobre a aprovação..."
-                value={approvalNotes}
-                onChange={(e) => setApprovalNotes(e.target.value)}
+                placeholder="Adicione observações..."
+                value={rejectionReason}
+                onChange={(e) => {
+                  setRejectionReason(e.target.value)
+                  setApprovalNotes(e.target.value)
+                }}
                 rows={3}
               />
             </div>
@@ -404,6 +443,7 @@ export function RequisitionDetailsContent() {
                 onClick={() => setShowApproveModal(true)}
                 className="bg-green-600 hover:bg-green-700 flex-1"
                 size="lg"
+                disabled={actionLoading}
               >
                 <CheckCircle className="w-5 h-5 mr-2" />
                 Aprovar
@@ -413,18 +453,10 @@ export function RequisitionDetailsContent() {
                 variant="outline"
                 className="text-red-600 border-red-600 flex-1"
                 size="lg"
+                disabled={actionLoading}
               >
                 <XCircle className="w-5 h-5 mr-2" />
                 Rejeitar
-              </Button>
-              <Button
-                onClick={() => setShowAdjustModal(true)}
-                variant="outline"
-                className="text-yellow-600 border-yellow-600 flex-1"
-                size="lg"
-              >
-                <AlertCircle className="w-5 h-5 mr-2" />
-                Solicitar Ajustes
               </Button>
             </div>
           </CardContent>
@@ -435,17 +467,17 @@ export function RequisitionDetailsContent() {
       <Dialog open={showApproveModal} onOpenChange={setShowApproveModal}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Aprovar RI #{mockRequisition.number}?</DialogTitle>
+            <DialogTitle>Aprovar RI #{requisition.codigo}?</DialogTitle>
             <DialogDescription>
-              Esta ação irá aprovar a requisição e notificar o solicitante e o departamento de Compras.
+              Esta ação irá aprovar a requisição e notificar o solicitante.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowApproveModal(false)}>
+            <Button variant="outline" onClick={() => setShowApproveModal(false)} disabled={actionLoading}>
               Cancelar
             </Button>
-            <Button onClick={handleApprove} className="bg-green-600 hover:bg-green-700">
-              Confirmar Aprovação
+            <Button onClick={handleApprove} className="bg-green-600 hover:bg-green-700" disabled={actionLoading}>
+              {actionLoading ? "Processando..." : "Confirmar Aprovação"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -455,8 +487,8 @@ export function RequisitionDetailsContent() {
       <Dialog open={showRejectModal} onOpenChange={setShowRejectModal}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Rejeitar RI #{mockRequisition.number}</DialogTitle>
-            <DialogDescription>Informe o motivo da rejeição para o solicitante.</DialogDescription>
+            <DialogTitle>Rejeitar RI #{requisition.codigo}</DialogTitle>
+            <DialogDescription>Confirme o motivo da rejeição da requisição.</DialogDescription>
           </DialogHeader>
           <div className="py-4">
             <Label>Motivo da Rejeição *</Label>
@@ -469,39 +501,11 @@ export function RequisitionDetailsContent() {
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowRejectModal(false)}>
+            <Button variant="outline" onClick={() => setShowRejectModal(false)} disabled={actionLoading}>
               Cancelar
             </Button>
-            <Button onClick={handleReject} className="bg-red-600 hover:bg-red-700">
-              Confirmar Rejeição
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Request Adjustments Modal */}
-      <Dialog open={showAdjustModal} onOpenChange={setShowAdjustModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Solicitar Ajustes - RI #{mockRequisition.number}</DialogTitle>
-            <DialogDescription>Descreva os ajustes necessários para o solicitante.</DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <Label>Ajustes Solicitados *</Label>
-            <Textarea
-              placeholder="Descreva os ajustes necessários..."
-              value={adjustmentRequest}
-              onChange={(e) => setAdjustmentRequest(e.target.value)}
-              rows={4}
-              className="mt-2"
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAdjustModal(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleRequestAdjustments} className="bg-yellow-600 hover:bg-yellow-700">
-              Enviar Solicitação
+            <Button onClick={handleReject} className="bg-red-600 hover:bg-red-700" disabled={actionLoading}>
+              {actionLoading ? "Processando..." : "Confirmar Rejeição"}
             </Button>
           </DialogFooter>
         </DialogContent>

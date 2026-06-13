@@ -20,6 +20,7 @@ import { GeneralSupplierTab } from "./form-tabs/general-supplier-tab"
 import { DocumentsTab } from "./form-tabs/documents-tab"
 import { ConditionsTab } from "./form-tabs/conditions-tab"
 import { ScorecardTab } from "./form-tabs/scorecard-tab"
+import { fornecedorService, FornecedorData } from "@/app/services/fornecedorService"
 
 interface SupplierFormContentProps {
   mode: "new" | "edit"
@@ -179,6 +180,129 @@ const initialFormData: SupplierFormData = {
   evaluationPeriod: "90",
 }
 
+// Mapeamento de formulário frontend para modelo de API do backend
+function mapFormToApi(form: SupplierFormData): FornecedorData {
+  return {
+    razao_social: form.companyName,
+    nome_fantasia: form.tradeName || null,
+    nuit: form.nuit,
+    tipo_pessoa: form.type === "juridica" ? "JURIDICA" : "FISICA",
+    email_principal: form.primaryEmail,
+    email_secundario: form.secondaryEmail || null,
+    telefone_principal: form.primaryPhone,
+    telefone_secundario: form.secondaryPhone || null,
+    website: form.website || null,
+    cobrança_rua: form.billingAddress.street,
+    cobrança_numero: form.billingAddress.number || null,
+    cobrança_complemento: form.billingAddress.complement || null,
+    cobrança_bairro: form.billingAddress.neighborhood,
+    cobrança_cidade: form.billingAddress.city,
+    cobrança_provincia: form.billingAddress.province,
+    cobrança_cep: form.billingAddress.zipCode || null,
+    cobrança_pais: form.billingAddress.country || "Moçambique",
+    mesmo_endereco: form.deliveryAddress.sameAsBilling,
+    entrega_rua: form.deliveryAddress.sameAsBilling ? form.billingAddress.street : form.deliveryAddress.street || null,
+    entrega_numero: form.deliveryAddress.sameAsBilling ? form.billingAddress.number : form.deliveryAddress.number || null,
+    entrega_complemento: form.deliveryAddress.sameAsBilling ? form.billingAddress.complement : form.deliveryAddress.complement || null,
+    entrega_bairro: form.deliveryAddress.sameAsBilling ? form.billingAddress.neighborhood : form.deliveryAddress.neighborhood || null,
+    entrega_cidade: form.deliveryAddress.sameAsBilling ? form.billingAddress.city : form.deliveryAddress.city || null,
+    entrega_provincia: form.deliveryAddress.sameAsBilling ? form.billingAddress.province : form.deliveryAddress.province || null,
+    entrega_cep: form.deliveryAddress.sameAsBilling ? form.billingAddress.zipCode : form.deliveryAddress.zipCode || null,
+    entrega_pais: form.deliveryAddress.sameAsBilling ? (form.billingAddress.country || "Moçambique") : (form.deliveryAddress.country || "Moçambique"),
+    status_ativo: form.status,
+    situacao: form.situation === "bloqueado" ? "Bloqueado" : form.situation === "avaliacao" ? "Avaliacao" : "Normal",
+    
+    cert_iso9001: form.certifications.iso9001,
+    cert_iso22000: form.certifications.iso22000,
+    cert_haccp: form.certifications.haccp,
+    cert_organico: form.certifications.organic,
+    cert_kosher: form.certifications.kosher,
+    cert_halal: form.certifications.halal,
+    cert_outras: form.certifications.others,
+
+    incoterm: form.incoterm || "EXW",
+    prazo_pagamento_dias: Number(form.paymentTerm) || 30,
+    moeda: form.currency || "MZN",
+    desconto_porcentagem: Number(form.discount) || 0.0,
+    prazo_entrega_dias: Number(form.deliveryTime) || 0,
+    formas_pagamento: form.paymentMethod,
+    valor_minimo_pedido: Number(form.minOrderValue) || 0.0,
+    valor_maximo_credito: Number(form.maxCreditValue) || 0.0,
+    sla_resposta_cotacao_h: Number(form.rfqResponseSla) || 24,
+    sla_validade_lote_h: Number(form.lotValiditySla) || 48,
+    sla_lead_time_dias: Number(form.averageLeadTime) || 0,
+    categorias_fornecidas: form.categories,
+    obs_categorias: form.categoryNotes || null
+  };
+}
+
+// Mapeamento de modelo de API do backend para formulário frontend
+function mapApiToForm(api: FornecedorData): SupplierFormData {
+  return {
+    companyName: api.razao_social || "",
+    tradeName: api.nome_fantasia || "",
+    nuit: api.nuit || "",
+    type: api.tipo_pessoa === "FISICA" ? "fisica" : "juridica",
+    primaryEmail: api.email_principal || "",
+    secondaryEmail: api.email_secundario || "",
+    primaryPhone: api.telefone_principal || "",
+    secondaryPhone: api.telefone_secundario || "",
+    website: api.website || "",
+    billingAddress: {
+      street: api.cobrança_rua || "",
+      number: api.cobrança_numero || "",
+      complement: api.cobrança_complemento || "",
+      neighborhood: api.cobrança_bairro || "",
+      city: api.cobrança_cidade || "",
+      province: api.cobrança_provincia || "",
+      zipCode: api.cobrança_cep || "",
+      country: api.cobrança_pais || "Moçambique",
+    },
+    deliveryAddress: {
+      sameAsBilling: api.mesmo_endereco ?? true,
+      street: api.entrega_rua || "",
+      number: api.entrega_numero || "",
+      complement: api.entrega_complemento || "",
+      neighborhood: api.entrega_bairro || "",
+      city: api.entrega_cidade || "",
+      province: api.entrega_provincia || "",
+      zipCode: api.entrega_cep || "",
+      country: api.entrega_pais || "Moçambique",
+    },
+    status: api.status_ativo ?? true,
+    situation: api.situacao === "Bloqueado" ? "bloqueado" : api.situacao === "Avaliacao" ? "avaliacao" : "normal",
+    blockReason: "",
+    certifications: {
+      iso9001: api.cert_iso9001 ?? false,
+      iso22000: api.cert_iso22000 ?? false,
+      haccp: api.cert_haccp ?? false,
+      organic: api.cert_organico ?? false,
+      kosher: api.cert_kosher ?? false,
+      halal: api.cert_halal ?? false,
+      others: api.cert_outras ?? false,
+    },
+    certificationDetails: [],
+    datasheets: [],
+    additionalDocuments: [],
+    incoterm: api.incoterm || "EXW",
+    paymentTerm: String(api.prazo_pagamento_dias ?? 30),
+    paymentMethod: api.formas_pagamento || [],
+    discount: api.desconto_porcentagem ?? 0,
+    currency: api.moeda || "MZN",
+    deliveryTime: api.prazo_entrega_dias ?? 0,
+    rfqResponseSla: api.sla_resposta_cotacao_h ?? 24,
+    lotValiditySla: api.sla_validade_lote_h ?? 48,
+    averageLeadTime: api.sla_lead_time_dias ?? 0,
+    minOrderValue: api.valor_minimo_pedido ?? 0,
+    maxCreditValue: api.valor_maximo_credito ?? 0,
+    categories: api.categorias_fornecidas || [],
+    categoryNotes: api.obs_categorias || "",
+    score: 85,
+    classification: "Bom",
+    evaluationPeriod: "90",
+  };
+}
+
 export function SupplierFormContent({ mode, supplierId }: SupplierFormContentProps) {
   const router = useRouter()
   const { toast } = useToast()
@@ -192,18 +316,21 @@ export function SupplierFormContent({ mode, supplierId }: SupplierFormContentPro
   // Load supplier data in edit mode
   useEffect(() => {
     if (mode === "edit" && supplierId) {
-      // Mock data for edit mode
-      setFormData({
-        ...initialFormData,
-        companyName: "Distribuidora Alimentos Ltda",
-        tradeName: "Distribuidora Alimentos",
-        nuit: "123456789",
-        primaryEmail: "contato@distribuidora.com",
-        primaryPhone: "(11) 98765-4321",
-        status: true,
-        score: 92,
-        classification: "Excelente",
-      })
+      async function loadSupplier() {
+        try {
+          const apiData = await fornecedorService.buscarPorId(supplierId!)
+          if (apiData) {
+            setFormData(mapApiToForm(apiData))
+          }
+        } catch (err) {
+          toast({
+            title: "Erro ao carregar",
+            description: "Não foi possível carregar os dados do fornecedor da API.",
+            variant: "destructive"
+          })
+        }
+      }
+      loadSupplier()
     }
   }, [mode, supplierId])
 
@@ -280,17 +407,32 @@ export function SupplierFormContent({ mode, supplierId }: SupplierFormContentPro
     }
 
     setIsSaving(true)
-
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-
-    toast({
-      title: "Fornecedor salvo com sucesso!",
-      description: `Fornecedor ${formData.companyName} foi ${mode === "new" ? "cadastrado" : "atualizado"} com sucesso.`,
-    })
-
-    setIsSaving(false)
-    router.push("/cadastros/fornecedores")
+    try {
+      const apiData = mapFormToApi(formData)
+      if (mode === "new") {
+        await fornecedorService.criar(apiData)
+        toast({
+          title: "Fornecedor cadastrado com sucesso!",
+          description: `Fornecedor ${formData.companyName} foi cadastrado com sucesso.`,
+        })
+      } else {
+        await fornecedorService.atualizar(supplierId!, apiData)
+        toast({
+          title: "Fornecedor atualizado com sucesso!",
+          description: `Fornecedor ${formData.companyName} foi atualizado com sucesso.`,
+        })
+      }
+      router.push("/cadastros/fornecedores")
+    } catch (err: any) {
+      console.error(err)
+      toast({
+        title: "Erro ao salvar",
+        description: err.response?.data?.error || "Ocorreu um erro ao comunicar com a API.",
+        variant: "destructive"
+      })
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const handleCancel = () => {
