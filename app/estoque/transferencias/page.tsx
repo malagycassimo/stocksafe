@@ -1,7 +1,7 @@
 "use client"
 
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { TransfersContent } from "@/components/transfers-content"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { TransfersContent } from "@/components/features/inventory/transfers-content"
 
 export default function TransfersPage() {
   const user = {
@@ -17,3 +17,7 @@ export default function TransfersPage() {
     </DashboardLayout>
   )
 }
+
+
+
+

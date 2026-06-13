@@ -1,7 +1,7 @@
 "use client"
 
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { ValidityPoliciesContent } from "@/components/validity-policies-content"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { ValidityPoliciesContent } from "@/components/features/admin/validity-policies-content"
 
 export default function ValidityPoliciesPage() {
   const user = {
@@ -17,3 +17,7 @@ export default function ValidityPoliciesPage() {
     </DashboardLayout>
   )
 }
+
+
+
+

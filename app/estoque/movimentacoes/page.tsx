@@ -1,7 +1,7 @@
 "use client"
 
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { InventoryMovementsContent } from "@/components/inventory-movements-content"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { InventoryMovementsContent } from "@/components/features/inventory/inventory-movements-content"
 
 export default function InventoryMovementsPage() {
   const user = {
@@ -17,3 +17,7 @@ export default function InventoryMovementsPage() {
     </DashboardLayout>
   )
 }
+
+
+
+

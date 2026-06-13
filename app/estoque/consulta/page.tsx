@@ -1,7 +1,7 @@
 "use client"
 
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { StockQueryContent } from "@/components/stock-query-content"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { StockQueryContent } from "@/components/features/inventory/stock-query-content"
 
 export default function StockQueryPage() {
   const user = {
@@ -17,3 +17,7 @@ export default function StockQueryPage() {
     </DashboardLayout>
   )
 }
+
+
+
+

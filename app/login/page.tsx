@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Mail, Lock, Eye, EyeOff, Package, User } from "lucide-react";
-import { ForgotPasswordModal } from "@/components/forgot-password-modal";
+import { ForgotPasswordModal } from "@/components/shared/forgot-password-modal";
 import Image from "next/image";
 import logoImage from "@/public/logo.svg";
 import { useAuth } from '@/hooks/useAuth';
@@ -106,7 +106,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex">
       {/* Left Column - Brand Section */}
-      <div className="hidden lg:flex lg:w-1/2 bg-emerald-500 flex-col items-center justify-center p-12 relative overflow-hidden">
+      <div className="hidden lg:flex lg:w-1/2 bg-imperial flex-col items-center justify-center p-12 relative overflow-hidden">
         {/* Background Pattern */}
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-20 left-20 w-64 h-64 border-2 border-white rounded-lg rotate-12" />
@@ -117,27 +117,15 @@ export default function LoginPage() {
         <div className="relative z-10 text-center space-y-8">
           {/* Logo */}
           <div className="flex items-center justify-center gap-3 mb-8">
-            <div className="bg-white p-3 rounded-xl">
-              <Image src={logoImage} alt="StockSafe Logo" className="w-12 h-12" />
-            </div>
-            <h1 className="text-5xl font-bold text-white">
-              <span className="text-blue-700 mr-2">Stock</span>
-              <span className="text-green-700">Safe</span>
-            </h1>
+              <Image src={logoImage} alt="StockSafe Logo" className="h-40" />
           </div>
-
-          {/* Tagline */}
-          <p className="text-2xl text-white font-medium max-w-md">
-            Rastreabilidade Inteligente de Estoque
-          </p>
-
           {/* Illustration */}
           <div className="mt-12 flex items-center justify-center gap-6">
             <div className="bg-white/20 backdrop-blur-sm p-6 rounded-2xl">
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center">
-                    <Package className="w-6 h-6 text-emerald-500" />
+                    <Package className="w-6 h-6 text-twilight" />
                   </div>
                   <div className="space-y-1">
                     <div className="h-2 w-24 bg-white rounded" />
@@ -146,7 +134,7 @@ export default function LoginPage() {
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center">
-                    <Package className="w-6 h-6 text-emerald-500" />
+                    <Package className="w-6 h-6 text-twilight" />
                   </div>
                   <div className="space-y-1">
                     <div className="h-2 w-24 bg-white rounded" />
@@ -155,7 +143,7 @@ export default function LoginPage() {
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center">
-                    <Package className="w-6 h-6 text-emerald-500" />
+                    <Package className="w-6 h-6 text-twilight" />
                   </div>
                   <div className="space-y-1">
                     <div className="h-2 w-24 bg-white rounded" />
@@ -176,13 +164,13 @@ export default function LoginPage() {
             <div className="bg-white p-2 rounded-lg">
               <Image src={logoImage} alt="StockSafe Logo" className="w-8 h-8" />
             </div>
-            <h1 className="text-3xl font-bold text-emerald-600">StockSafe</h1>
+            <h1 className="text-3xl font-bold text-imperial">GestStock</h1>
           </div>
 
           {/* Form Card */}
           <div className="space-y-6">
             <div className="space-y-2">
-              <h2 className="text-3xl font-bold text-emerald-600 text-center">
+              <h2 className="text-3xl font-bold text-imperial text-center">
                 Bem-vindo de volta
               </h2>
               <p className="text-muted-foreground text-center">
@@ -199,7 +187,7 @@ export default function LoginPage() {
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground z-10" />
                   <Select value={profile} onValueChange={setProfile}>
-                    <SelectTrigger id="profile" className="pl-10 h-12 focus:ring-emerald-500">
+                    <SelectTrigger id="profile" className="pl-10 h-12 focus:ring-imperial">
                       <SelectValue placeholder="Selecione seu perfil" />
                     </SelectTrigger>
                     <SelectContent>
@@ -229,7 +217,7 @@ export default function LoginPage() {
                     placeholder="seu.email@empresa.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10 h-12 focus-visible:ring-emerald-500"
+                    className="pl-10 h-12 focus-visible:ring-imperial"
                     required
                   />
                 </div>
@@ -248,7 +236,7 @@ export default function LoginPage() {
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10 pr-10 h-12 focus-visible:ring-emerald-500"
+                    className="pl-10 pr-10 h-12 focus-visible:ring-imperial"
                     required
                     minLength={6}
                   />
@@ -274,7 +262,7 @@ export default function LoginPage() {
                   onCheckedChange={(checked) =>
                     setRememberMe(checked as boolean)
                   }
-                  className="data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
+                  className="data-[state=checked]:bg-imperial data-[state=checked]:border-imperial"
                 />
                 <label
                   htmlFor="remember"
@@ -294,7 +282,7 @@ export default function LoginPage() {
               {/* Submit Button */}
               <Button
                 type="submit"
-                className="w-full h-12 bg-emerald-500 hover:bg-emerald-600 text-white font-medium text-base"
+                className="w-full h-12 bg-imperial hover:bg-twilight text-white font-medium text-base"
                 disabled={isLoading}
               >
                 {isLoading ? "Entrando..." : "Entrar"}
@@ -305,7 +293,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(true)}
-                  className="text-sm text-emerald-600 hover:text-emerald-700 font-medium hover:underline"
+                  className="text-sm text-twilight hover:text-imperial font-medium hover:underline"
                 >
                   Esqueceu a senha?
                 </button>
@@ -330,3 +318,7 @@ export default function LoginPage() {
     </div>
   );
 }
+
+
+
+

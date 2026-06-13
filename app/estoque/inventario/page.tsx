@@ -1,7 +1,7 @@
 "use client"
 
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { InventoryScheduleContent } from "@/components/inventory-schedule-content"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { InventoryScheduleContent } from "@/components/features/inventory/inventory-schedule-content"
 
 export default function InventorySchedulePage() {
   const user = {
@@ -17,3 +17,7 @@ export default function InventorySchedulePage() {
     </DashboardLayout>
   )
 }
+
+
+
+

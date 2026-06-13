@@ -1,7 +1,7 @@
 "use client"
 
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { PoInvoicingContent } from "@/components/po-invoicing-content"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { PoInvoicingContent } from "@/components/features/purchasing/po-invoicing-content"
 
 export default function PoInvoicingPage() {
   const user = {
@@ -17,3 +17,5 @@ export default function PoInvoicingPage() {
     </DashboardLayout>
   )
 }
+
+

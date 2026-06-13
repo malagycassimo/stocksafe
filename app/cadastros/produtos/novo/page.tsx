@@ -1,7 +1,7 @@
 "use client"
 
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { ProductFormContent } from "@/components/product-form-content"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { ProductFormContent } from "@/components/features/registrations/product-form-content"
 
 const MOCK_USER = {
   name: "João Silva",
@@ -17,3 +17,7 @@ export default function NewProductPage() {
     </DashboardLayout>
   )
 }
+
+
+
+

@@ -1,7 +1,7 @@
 "use client"
 
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { RequisitionsListContent } from "@/components/requisitions-list-content"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { RequisitionsListContent } from "@/components/features/requisitions/requisitions-list-content"
 
 export default function RequisitionsPage() {
   const user = {
@@ -17,3 +17,7 @@ export default function RequisitionsPage() {
     </DashboardLayout>
   )
 }
+
+
+
+

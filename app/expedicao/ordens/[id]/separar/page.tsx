@@ -1,8 +1,8 @@
 "use client"
 
 import { use } from "react"
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { PickingExecutionContent } from "@/components/picking-execution-content"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { PickingExecutionContent } from "@/components/features/shipping/picking-execution-content"
 
 export default function PickingExecutionPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -20,3 +20,5 @@ export default function PickingExecutionPage({ params }: { params: Promise<{ id:
     </DashboardLayout>
   )
 }
+
+

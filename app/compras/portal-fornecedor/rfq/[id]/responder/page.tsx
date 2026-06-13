@@ -1,7 +1,7 @@
 "use client"
 
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { SupplierRfqResponseContent } from "@/components/supplier-rfq-response-content"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { SupplierRfqResponseContent } from "@/components/features/purchasing/supplier-rfq-response-content"
 
 export default function SupplierRfqResponsePage() {
   const user = {
@@ -17,3 +17,5 @@ export default function SupplierRfqResponsePage() {
     </DashboardLayout>
   )
 }
+
+

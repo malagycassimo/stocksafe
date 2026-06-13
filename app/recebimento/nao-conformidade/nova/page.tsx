@@ -1,7 +1,7 @@
 "use client"
 
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { NonConformityRegistrationContent } from "@/components/non-conformity-registration-content"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { NonConformityRegistrationContent } from "@/components/features/receiving/non-conformity-registration-content"
 
 export default function NonConformityRegistrationPage() {
   const user = {
@@ -17,3 +17,7 @@ export default function NonConformityRegistrationPage() {
     </DashboardLayout>
   )
 }
+
+
+
+

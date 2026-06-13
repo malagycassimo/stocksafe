@@ -1,7 +1,7 @@
 "use client"
 
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { LabelStandardsContent } from "@/components/label-standards-content"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { LabelStandardsContent } from "@/components/features/admin/label-standards-content"
 
 export default function LabelStandardsPage() {
   const user = {
@@ -17,3 +17,7 @@ export default function LabelStandardsPage() {
     </DashboardLayout>
   )
 }
+
+
+
+

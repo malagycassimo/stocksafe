@@ -1,7 +1,7 @@
 "use client"
 
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { ProposalsComparisonContent } from "@/components/proposals-comparison-content"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { ProposalsComparisonContent } from "@/components/features/purchasing/proposals-comparison-content"
 
 export default function ProposalsComparisonPage() {
   const user = {
@@ -17,3 +17,5 @@ export default function ProposalsComparisonPage() {
     </DashboardLayout>
   )
 }
+
+

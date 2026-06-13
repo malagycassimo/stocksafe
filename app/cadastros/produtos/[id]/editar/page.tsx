@@ -1,7 +1,7 @@
 "use client"
 
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { ProductFormContent } from "@/components/product-form-content"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { ProductFormContent } from "@/components/features/registrations/product-form-content"
 import { use } from "react"
 
 const MOCK_USER = {
@@ -20,3 +20,5 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
     </DashboardLayout>
   )
 }
+
+

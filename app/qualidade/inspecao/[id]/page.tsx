@@ -1,7 +1,7 @@
 "use client"
 
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { QualityInspectionContent } from "@/components/quality-inspection-content"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { QualityInspectionContent } from "@/components/features/quality/quality-inspection-content"
 
 export default function QualityInspectionPage() {
   const user = {
@@ -17,3 +17,5 @@ export default function QualityInspectionPage() {
     </DashboardLayout>
   )
 }
+
+

@@ -1,7 +1,7 @@
 "use client"
 
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { AwaitingReceiptContent } from "@/components/awaiting-receipt-content"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { AwaitingReceiptContent } from "@/components/features/receiving/awaiting-receipt-content"
 
 export default function AwaitingReceiptPage() {
   const user = {
@@ -17,3 +17,7 @@ export default function AwaitingReceiptPage() {
     </DashboardLayout>
   )
 }
+
+
+
+

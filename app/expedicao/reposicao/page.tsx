@@ -1,7 +1,7 @@
 "use client"
 
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { StockReplenishmentContent } from "@/components/stock-replenishment-content"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { StockReplenishmentContent } from "@/components/features/shipping/stock-replenishment-content"
 
 export default function StockReplenishmentPage() {
   const user = {
@@ -17,3 +17,7 @@ export default function StockReplenishmentPage() {
     </DashboardLayout>
   )
 }
+
+
+
+

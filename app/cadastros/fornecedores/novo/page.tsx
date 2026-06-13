@@ -1,7 +1,7 @@
 "use client"
 
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { SupplierFormContent } from "@/components/supplier-form-content"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { SupplierFormContent } from "@/components/features/registrations/supplier-form-content"
 
 export default function NewSupplierPage() {
   const user = {
@@ -17,3 +17,7 @@ export default function NewSupplierPage() {
     </DashboardLayout>
   )
 }
+
+
+
+

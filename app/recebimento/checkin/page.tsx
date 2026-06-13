@@ -1,7 +1,7 @@
 "use client"
 
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { CheckinContent } from "@/components/checkin-content"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { CheckinContent } from "@/components/features/receiving/checkin-content"
 
 export default function CheckinPage() {
   const user = {
@@ -17,3 +17,7 @@ export default function CheckinPage() {
     </DashboardLayout>
   )
 }
+
+
+
+

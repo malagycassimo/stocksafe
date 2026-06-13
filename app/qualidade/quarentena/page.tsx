@@ -1,7 +1,7 @@
 "use client"
 
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { QuarantineQueueContent } from "@/components/quarantine-queue-content"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { QuarantineQueueContent } from "@/components/features/quality/quarantine-queue-content"
 
 export default function QuarantineQueuePage() {
   const user = {
@@ -17,3 +17,7 @@ export default function QuarantineQueuePage() {
     </DashboardLayout>
   )
 }
+
+
+
+

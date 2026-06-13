@@ -1,7 +1,7 @@
 "use client"
 
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { PosListContent } from "@/components/pos-list-content"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { PosListContent } from "@/components/features/purchasing/pos-list-content"
 
 export default function PosListPage() {
   const user = {
@@ -17,3 +17,7 @@ export default function PosListPage() {
     </DashboardLayout>
   )
 }
+
+
+
+

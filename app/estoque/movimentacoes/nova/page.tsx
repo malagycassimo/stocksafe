@@ -1,7 +1,7 @@
 "use client"
 
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { NewManualMovementContent } from "@/components/new-manual-movement-content"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { NewManualMovementContent } from "@/components/features/inventory/new-manual-movement-content"
 
 export default function NewManualMovementPage() {
   const user = {
@@ -17,3 +17,7 @@ export default function NewManualMovementPage() {
     </DashboardLayout>
   )
 }
+
+
+
+

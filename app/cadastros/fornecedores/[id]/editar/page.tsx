@@ -1,7 +1,7 @@
 "use client"
 
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { SupplierFormContent } from "@/components/supplier-form-content"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { SupplierFormContent } from "@/components/features/registrations/supplier-form-content"
 import { use } from "react"
 
 export default function EditSupplierPage({ params }: { params: Promise<{ id: string }> }) {
@@ -20,3 +20,5 @@ export default function EditSupplierPage({ params }: { params: Promise<{ id: str
     </DashboardLayout>
   )
 }
+
+

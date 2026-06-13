@@ -1,7 +1,7 @@
 "use client"
 
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { SuppliersListContent } from "@/components/suppliers-list-content"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { SuppliersListContent } from "@/components/features/registrations/suppliers-list-content"
 
 export default function SuppliersPage() {
   const user = {
@@ -17,3 +17,7 @@ export default function SuppliersPage() {
     </DashboardLayout>
   )
 }
+
+
+
+
