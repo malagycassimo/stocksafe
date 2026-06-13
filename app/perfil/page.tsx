@@ -1,7 +1,7 @@
 "use client"
 
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { ProfileContent } from "@/components/profile-content"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { ProfileContent } from "@/components/shared/profile-content"
 import { useAuth } from "@/hooks/useAuth"
 
 export default function ProfilePage() {
