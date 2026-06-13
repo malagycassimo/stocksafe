@@ -534,3 +534,6 @@ export function getSidebarConfig(profile: string): { items: MenuItem[] } {
   const userProfile = profile as UserProfile
   return SIDEBAR_CONFIG[userProfile] || SIDEBAR_CONFIG.GERAL
 }
+
+
+

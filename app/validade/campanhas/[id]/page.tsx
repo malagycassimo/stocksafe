@@ -1,8 +1,8 @@
 "use client"
 
 import { use } from "react"
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { CampaignMonitoringContent } from "@/components/campaign-monitoring-content"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { CampaignMonitoringContent } from "@/components/features/validity/campaign-monitoring-content"
 
 export default function CampaignMonitoringPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -20,3 +20,5 @@ export default function CampaignMonitoringPage({ params }: { params: Promise<{ i
     </DashboardLayout>
   )
 }
+
+

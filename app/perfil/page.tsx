@@ -1,7 +1,7 @@
 "use client"
 
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { ProfileContent } from "@/components/profile-content"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { ProfileContent } from "@/components/shared/profile-content"
 
 export default function ProfilePage() {
   // Mock user data - in production this would come from auth/session
@@ -23,3 +23,7 @@ export default function ProfilePage() {
     </DashboardLayout>
   )
 }
+
+
+
+

@@ -1,7 +1,7 @@
 "use client"
 
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { ProductsListContent } from "@/components/products-list-content"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { ProductsListContent } from "@/components/features/registrations/products-list-content"
 
 const MOCK_USER = {
   name: "João Silva",
@@ -17,3 +17,7 @@ export default function ProductsListPage() {
     </DashboardLayout>
   )
 }
+
+
+
+

@@ -1,8 +1,0 @@
-Console Error
-
-A param property was accessed directly with `params.id`. `params` is a Promise and must be unwrapped with `React.use()` before accessing its properties. Learn more: https://nextjs.org/docs/messages/sync-dynamic-apis
-
-Runtime TypeError
-
-
-Cannot read properties of undefined (reading 'padStart')

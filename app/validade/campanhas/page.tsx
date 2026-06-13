@@ -1,7 +1,7 @@
 "use client"
 
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { CampaignsListContent } from "@/components/campaigns-list-content"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { CampaignsListContent } from "@/components/features/validity/campaigns-list-content"
 
 export default function CampaignsListPage() {
   const user = {
@@ -17,3 +17,7 @@ export default function CampaignsListPage() {
     </DashboardLayout>
   )
 }
+
+
+
+

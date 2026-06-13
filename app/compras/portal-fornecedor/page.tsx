@@ -1,7 +1,7 @@
 "use client"
 
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { SupplierPortalContent } from "@/components/supplier-portal-content"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { SupplierPortalContent } from "@/components/features/purchasing/supplier-portal-content"
 
 export default function SupplierPortalPage() {
   const user = {
@@ -17,3 +17,7 @@ export default function SupplierPortalPage() {
     </DashboardLayout>
   )
 }
+
+
+
+

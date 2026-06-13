@@ -1,7 +1,7 @@
 "use client"
 
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { UsersListContent } from "@/components/users-list-content"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { UsersListContent } from "@/components/features/admin/users-list-content"
 
 export default function UsersPage() {
   const user = {
@@ -17,3 +17,7 @@ export default function UsersPage() {
     </DashboardLayout>
   )
 }
+
+
+
+

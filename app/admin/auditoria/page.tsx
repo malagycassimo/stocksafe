@@ -1,7 +1,7 @@
 "use client"
 
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { AuditTrailContent } from "@/components/audit-trail-content"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { AuditTrailContent } from "@/components/features/admin/audit-trail-content"
 
 export default function AuditTrailPage() {
   const user = {
@@ -17,3 +17,7 @@ export default function AuditTrailPage() {
     </DashboardLayout>
   )
 }
+
+
+
+

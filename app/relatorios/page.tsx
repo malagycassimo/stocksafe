@@ -1,7 +1,7 @@
 "use client"
 
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { ReportsHubContent } from "@/components/reports-hub-content"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { ReportsHubContent } from "@/components/shared/reports-hub-content"
 
 export default function ReportsPage() {
   const user = {
@@ -17,3 +17,7 @@ export default function ReportsPage() {
     </DashboardLayout>
   )
 }
+
+
+
+

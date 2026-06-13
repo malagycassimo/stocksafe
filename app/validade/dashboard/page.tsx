@@ -1,7 +1,7 @@
 "use client"
 
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { ExpiryDashboardContent } from "@/components/expiry-dashboard-content"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { ExpiryDashboardContent } from "@/components/features/validity/expiry-dashboard-content"
 
 export default function ExpiryDashboardPage() {
   const user = {
@@ -17,3 +17,7 @@ export default function ExpiryDashboardPage() {
     </DashboardLayout>
   )
 }
+
+
+
+

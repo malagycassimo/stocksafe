@@ -1,7 +1,7 @@
 "use client"
 
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { RfqsListContent } from "@/components/rfqs-list-content"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { RfqsListContent } from "@/components/features/purchasing/rfqs-list-content"
 
 export default function RfqsListPage() {
   const user = {
@@ -17,3 +17,7 @@ export default function RfqsListPage() {
     </DashboardLayout>
   )
 }
+
+
+
+

@@ -1,8 +1,8 @@
 "use client"
 
 import { use } from "react"
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { InventoryAdjustmentsContent } from "@/components/inventory-adjustments-content"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { InventoryAdjustmentsContent } from "@/components/features/inventory/inventory-adjustments-content"
 
 export default function InventoryAdjustmentsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -20,3 +20,5 @@ export default function InventoryAdjustmentsPage({ params }: { params: Promise<{
     </DashboardLayout>
   )
 }
+
+

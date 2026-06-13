@@ -1,7 +1,7 @@
 "use client"
 
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { FiscalReceivingContent } from "@/components/fiscal-receiving-content"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { FiscalReceivingContent } from "@/components/features/receiving/fiscal-receiving-content"
 
 export default function FiscalReceivingPage() {
   const user = {
@@ -17,3 +17,5 @@ export default function FiscalReceivingPage() {
     </DashboardLayout>
   )
 }
+
+

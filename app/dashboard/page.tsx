@@ -1,12 +1,12 @@
 "use client"
 
 import { useState } from "react"
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { RequisitanteDashboard } from "@/components/requisitante-dashboard"
-import { ComprasDashboard } from "@/components/compras-dashboard"
-import { RecebimentoDashboard } from "@/components/recebimento-dashboard"
-import { QADashboard } from "@/components/qa-dashboard"
-import { AdminDashboard } from "@/components/admin-dashboard"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { RequisitanteDashboard } from "@/components/features/requisitions/requisitante-dashboard"
+import { ComprasDashboard } from "@/components/features/purchasing/compras-dashboard"
+import { RecebimentoDashboard } from "@/components/features/receiving/recebimento-dashboard"
+import { QADashboard } from "@/components/features/quality/qa-dashboard"
+import { AdminDashboard } from "@/components/features/admin/admin-dashboard"
 
 // Mock user profile - in production, this would come from auth context
 const MOCK_USER = {
@@ -48,7 +48,7 @@ export default function DashboardPage() {
 
         {/* Page Title */}
         <div className="space-y-1">
-          <h1 className="text-3xl font-bold text-emerald-600">Dashboard</h1>
+          <h1 className="text-3xl font-bold text-imperial">Dashboard</h1>
           <p className="text-muted-foreground">Visão geral do sistema</p>
         </div>
 
@@ -58,3 +58,8 @@ export default function DashboardPage() {
     </DashboardLayout>
   )
 }
+
+
+
+
+

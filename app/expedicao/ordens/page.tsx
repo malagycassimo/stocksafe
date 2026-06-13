@@ -1,7 +1,7 @@
 "use client"
 
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { PickingOrdersContent } from "@/components/picking-orders-content"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { PickingOrdersContent } from "@/components/features/shipping/picking-orders-content"
 
 export default function PickingOrdersPage() {
   const user = {
@@ -17,3 +17,7 @@ export default function PickingOrdersPage() {
     </DashboardLayout>
   )
 }
+
+
+
+

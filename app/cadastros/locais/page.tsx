@@ -1,7 +1,7 @@
 "use client"
 
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { LocationsContent } from "@/components/locations-content"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { LocationsContent } from "@/components/features/registrations/locations-content"
 
 export default function LocationsPage() {
   const user = {
@@ -17,3 +17,7 @@ export default function LocationsPage() {
     </DashboardLayout>
   )
 }
+
+
+
+

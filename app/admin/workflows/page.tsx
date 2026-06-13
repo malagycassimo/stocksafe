@@ -1,7 +1,7 @@
 "use client"
 
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { WorkflowsContent } from "@/components/workflows-content"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { WorkflowsContent } from "@/components/features/admin/workflows-content"
 
 export default function WorkflowsPage() {
   const user = {
@@ -17,3 +17,7 @@ export default function WorkflowsPage() {
     </DashboardLayout>
   )
 }
+
+
+
+

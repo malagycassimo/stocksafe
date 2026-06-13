@@ -1,7 +1,7 @@
 "use client"
 
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { ProvisionalLabelsContent } from "@/components/provisional-labels-content"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { ProvisionalLabelsContent } from "@/components/features/purchasing/provisional-labels-content"
 
 export default function ProvisionalLabelsPage() {
   const user = {
@@ -17,3 +17,5 @@ export default function ProvisionalLabelsPage() {
     </DashboardLayout>
   )
 }
+
+

@@ -2,8 +2,8 @@
 
 import { Suspense } from "react"
 import { useSearchParams } from "next/navigation"
-import { DashboardLayout } from "@/components/dashboard-layout"
-import { PhysicalInspectionContent } from "@/components/physical-inspection-content"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { PhysicalInspectionContent } from "@/components/features/quality/physical-inspection-content"
 
 function InspectionPageContent() {
   const searchParams = useSearchParams()
@@ -31,3 +31,7 @@ export default function InspectionPage() {
     </Suspense>
   )
 }
+
+
+
+
