@@ -115,7 +115,7 @@ export function NewCampaignContent() {
                 <Input
                   id="min-value"
                   type="number"
-                  placeholder="R$ 0,00"
+                  placeholder="MZN 0,00"
                   value={minValue}
                   onChange={(e) => setMinValue(e.target.value)}
                 />
@@ -145,7 +145,7 @@ export function NewCampaignContent() {
                   </div>
                   <div className="text-center">
                     <p className="text-sm text-muted-foreground">Valor Total</p>
-                    <p className="text-3xl font-bold text-red-600">R$ 8.920</p>
+                    <p className="text-3xl font-bold text-red-600">MZN 8.920</p>
                   </div>
                 </div>
 
@@ -171,7 +171,7 @@ export function NewCampaignContent() {
                           <p className="text-xs text-orange-600">3 dias</p>
                         </td>
                         <td className="p-2 text-right">50 kg</td>
-                        <td className="p-2 text-right">R$ 925,00</td>
+                        <td className="p-2 text-right">MZN 925,00</td>
                       </tr>
                     </tbody>
                   </table>
@@ -365,7 +365,7 @@ export function NewCampaignContent() {
                 <div className="grid gap-4 md:grid-cols-3">
                   <div className="text-center p-4 bg-muted rounded">
                     <p className="text-sm text-muted-foreground">Valor Total</p>
-                    <p className="text-2xl font-bold text-red-600">R$ 8.920</p>
+                    <p className="text-2xl font-bold text-red-600">MZN 8.920</p>
                   </div>
                   <div className="text-center p-4 bg-muted rounded">
                     <p className="text-sm text-muted-foreground">Qtd Total</p>

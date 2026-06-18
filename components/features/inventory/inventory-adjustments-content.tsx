@@ -417,14 +417,14 @@ export function InventoryAdjustmentsContent({ inventoryId }: { inventoryId: stri
               <p className="text-sm text-muted-foreground">Valor</p>
               <div className="flex items-center gap-2">
                 <TrendingUp className="w-4 h-4 text-imperial" />
-                <p className="text-lg font-semibold text-imperial">+R$ {surplusValue.toFixed(2)}</p>
+                <p className="text-lg font-semibold text-imperial">+MZN {surplusValue.toFixed(2)}</p>
               </div>
               <div className="flex items-center gap-2">
                 <TrendingDown className="w-4 h-4 text-red-600" />
-                <p className="text-lg font-semibold text-red-600">-R$ {shortageValue.toFixed(2)}</p>
+                <p className="text-lg font-semibold text-red-600">-MZN {shortageValue.toFixed(2)}</p>
               </div>
               <p className={`text-xl font-bold mt-2 ${netImpact >= 0 ? "text-imperial" : "text-red-700"}`}>
-                R$ {netImpact >= 0 ? "+" : ""}{netImpact.toFixed(2)}
+                MZN {netImpact >= 0 ? "+" : ""}{netImpact.toFixed(2)}
               </p>
             </div>
           </CardContent>
@@ -528,7 +528,7 @@ export function InventoryAdjustmentsContent({ inventoryId }: { inventoryId: stri
               <div>
                 <span className="font-semibold text-imperial">{selectedItems.length} itens selecionados</span>
                 <div className="text-sm text-imperial mt-1">
-                  Impacto Total: R${" "}
+                  Impacto Total: MZN{" "}
                   {selectedItems
                     .reduce((sum, id) => {
                       const div = divergences.find((d) => d.id === id)
@@ -579,7 +579,7 @@ export function InventoryAdjustmentsContent({ inventoryId }: { inventoryId: stri
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Qtd Contada</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Divergência</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Impacto (R$)</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Impacto (MZN)</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Motivo</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Evidências</th>
                 <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 w-[120px]">Ações</th>
@@ -658,7 +658,7 @@ export function InventoryAdjustmentsContent({ inventoryId }: { inventoryId: stri
                     </td>
                     <td className="px-4 py-3">
                       <div className={`font-semibold ${div.impact > 0 ? "text-imperial" : "text-red-700"}`}>
-                        R$ {div.impact > 0 ? "+" : ""}
+                        MZN {div.impact > 0 ? "+" : ""}
                         {div.impact.toFixed(2)}
                       </div>
                     </td>
@@ -726,7 +726,7 @@ export function InventoryAdjustmentsContent({ inventoryId }: { inventoryId: stri
                 <h3 className="font-semibold text-imperial mb-2">Aplicar Ajustes ao Estoque</h3>
                 <div className="text-sm text-imperial">
                   <p>{approvedCount} ajustes aprovados prontos para aplicação</p>
-                  <p className="font-semibold mt-1">Impacto Líquido: R$ {netImpact >= 0 ? "+" : ""}{netImpact.toFixed(2)}</p>
+                  <p className="font-semibold mt-1">Impacto Líquido: MZN {netImpact >= 0 ? "+" : ""}{netImpact.toFixed(2)}</p>
                 </div>
               </div>
               <Button className="bg-imperial hover:bg-imperial" onClick={handleApplyAdjustments}>
@@ -777,7 +777,7 @@ export function InventoryAdjustmentsContent({ inventoryId }: { inventoryId: stri
                     <div>
                       <span className="text-muted-foreground">Impacto:</span>{" "}
                       <span className={`font-bold ${selectedDivergence.impact > 0 ? "text-imperial" : "text-red-700"}`}>
-                        R$ {selectedDivergence.impact > 0 ? "+" : ""}
+                        MZN {selectedDivergence.impact > 0 ? "+" : ""}
                         {selectedDivergence.impact.toFixed(2)}
                       </span>
                     </div>
@@ -1009,7 +1009,7 @@ export function InventoryAdjustmentsContent({ inventoryId }: { inventoryId: stri
                     afetados
                   </p>
                   <p className={`text-lg font-bold ${netImpact >= 0 ? "text-imperial" : "text-red-700"}`}>
-                    Impacto: R$ {netImpact >= 0 ? "+" : ""}
+                    Impacto: MZN {netImpact >= 0 ? "+" : ""}
                     {netImpact.toFixed(2)}
                   </p>
                 </div>

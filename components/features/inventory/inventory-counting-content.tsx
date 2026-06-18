@@ -478,12 +478,12 @@ export function InventoryCountingContent({ inventoryId }: { inventoryId: string 
                     </div>
                     <div>
                       <div className="text-sm text-muted-foreground">Valor Unitário</div>
-                      <div className="text-xl font-semibold">R$ {selectedItem.unitValue.toFixed(2)}</div>
+                      <div className="text-xl font-semibold">MZN {selectedItem.unitValue.toFixed(2)}</div>
                     </div>
                     <div>
                       <div className="text-sm text-muted-foreground">Valor Total</div>
                       <div className="text-xl font-semibold">
-                        R$ {(selectedItem.systemQty * selectedItem.unitValue).toLocaleString("pt-BR")}
+                        MZN {(selectedItem.systemQty * selectedItem.unitValue).toLocaleString("pt-BR")}
                       </div>
                     </div>
                   </div>

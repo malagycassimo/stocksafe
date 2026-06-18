@@ -776,7 +776,7 @@ export function NewManualMovementContent() {
                 <div>
                   <Label>Valor Unitário {movementType === "entry" && "*"}</Label>
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">R$</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">MZN</span>
                     <Input
                       type="number"
                       placeholder="0,00"
@@ -792,7 +792,7 @@ export function NewManualMovementContent() {
                 <div>
                   <Label>Valor Total</Label>
                   <div className="h-10 flex items-center px-3 bg-gray-100 rounded-md font-semibold text-imperial">
-                    R$ {calculateTotalValue().toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    MZN {calculateTotalValue().toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                   </div>
                 </div>
               </div>

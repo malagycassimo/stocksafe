@@ -135,13 +135,13 @@ export function CampaignMonitoringContent({ campaignId }: CampaignMonitoringCont
             <div className="text-center space-y-2">
               <DollarSign className="h-12 w-12 mx-auto text-imperial" />
               <div>
-                <p className="text-3xl font-bold text-imperial">R$ {campaign.valorSalvo.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
+                <p className="text-3xl font-bold text-imperial">MZN {campaign.valorSalvo.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
                 <p className="text-sm font-medium mt-1">Valor Salvo</p>
                 <p className="text-xs text-muted-foreground">
                   {((campaign.valorSalvo / campaign.valorTotal) * 100).toFixed(0)}% do valor total
                 </p>
                 <p className="text-xs text-red-600 mt-2">
-                  R$ {campaign.valorEmRisco.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} ainda em risco
+                  MZN {campaign.valorEmRisco.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} ainda em risco
                 </p>
               </div>
             </div>
@@ -306,7 +306,7 @@ export function CampaignMonitoringContent({ campaignId }: CampaignMonitoringCont
                   <td className="p-2 text-right">50 kg</td>
                   <td className="p-2 text-right text-imperial font-medium">50 kg</td>
                   <td className="p-2 text-right">0 kg</td>
-                  <td className="p-2 text-right font-bold text-imperial">R$ 925,00</td>
+                  <td className="p-2 text-right font-bold text-imperial">MZN 925,00</td>
                   <td className="p-2">Transferido p/ Loja Centro</td>
                   <td className="p-2 text-center">
                     <Button size="sm" variant="outline">Ver Detalhes</Button>
@@ -334,7 +334,7 @@ export function CampaignMonitoringContent({ campaignId }: CampaignMonitoringCont
                   <td className="p-2 text-right">100 L</td>
                   <td className="p-2 text-right text-imperial font-medium">70 L</td>
                   <td className="p-2 text-right text-yellow-600">30 L</td>
-                  <td className="p-2 text-right font-bold text-imperial">R$ 623,00</td>
+                  <td className="p-2 text-right font-bold text-imperial">MZN 623,00</td>
                   <td className="p-2">Vendido (desc. 20%)</td>
                   <td className="p-2 text-center">
                     <Button size="sm" className="bg-orange-600 hover:bg-orange-700">Ação Urgente</Button>
@@ -362,7 +362,7 @@ export function CampaignMonitoringContent({ campaignId }: CampaignMonitoringCont
                   <td className="p-2 text-right">10 kg</td>
                   <td className="p-2 text-right">0 kg</td>
                   <td className="p-2 text-right">0 kg</td>
-                  <td className="p-2 text-right font-bold text-red-600">R$ 0,00</td>
+                  <td className="p-2 text-right font-bold text-red-600">MZN 0,00</td>
                   <td className="p-2 text-red-600">Vencido</td>
                   <td className="p-2 text-center">
                     <Button size="sm" variant="destructive">Descartar</Button>
@@ -379,7 +379,7 @@ export function CampaignMonitoringContent({ campaignId }: CampaignMonitoringCont
                 <span className="text-imperial">Qtd Escoada: {campaign.itemsEscoados}</span>
               </div>
               <div>
-                <span className="font-bold text-imperial">Valor Total Salvo: R$ {campaign.valorSalvo.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
+                <span className="font-bold text-imperial">Valor Total Salvo: MZN {campaign.valorSalvo.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
               </div>
             </div>
           </div>
@@ -395,7 +395,7 @@ export function CampaignMonitoringContent({ campaignId }: CampaignMonitoringCont
               <div className="flex-1">
                 <p className="text-2xl font-bold">3</p>
                 <p className="text-sm text-muted-foreground">Transferências</p>
-                <p className="text-xs mt-1">120 unidades | R$ 2.150</p>
+                <p className="text-xs mt-1">120 unidades | MZN 2.150</p>
                 <Button variant="link" className="p-0 h-auto text-xs mt-1">Ver Detalhes →</Button>
               </div>
             </div>
@@ -409,7 +409,7 @@ export function CampaignMonitoringContent({ campaignId }: CampaignMonitoringCont
               <div className="flex-1">
                 <p className="text-2xl font-bold">5</p>
                 <p className="text-sm text-muted-foreground">Vendas com Desconto</p>
-                <p className="text-xs mt-1">Desc. médio: 22% | R$ 3.695</p>
+                <p className="text-xs mt-1">Desc. médio: 22% | MZN 3.695</p>
                 <Button variant="link" className="p-0 h-auto text-xs mt-1">Ver Detalhes →</Button>
               </div>
             </div>

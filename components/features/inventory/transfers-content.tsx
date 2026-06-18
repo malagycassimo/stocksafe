@@ -399,7 +399,7 @@ export function TransfersContent() {
             <div>
               <p className="text-sm text-muted-foreground">Valor em Trânsito</p>
               <p className="text-2xl font-bold text-imperial">
-                R$ {totalValue.toLocaleString("pt-BR")}
+                MZN {totalValue.toLocaleString("pt-BR")}
               </p>
               <p className="text-xs text-muted-foreground mt-1">Custo médio dos produtos</p>
             </div>

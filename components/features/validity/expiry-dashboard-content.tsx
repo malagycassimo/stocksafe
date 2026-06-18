@@ -33,7 +33,7 @@ export function ExpiryDashboardContent() {
           <div className="flex items-start gap-3">
             <AlertTriangle className="h-6 w-6 text-red-600 mt-0.5" />
             <div className="flex-1">
-              <p className="font-bold text-red-900">🔴 3 produtos venceram nas últimas 24 horas (R$ 450,00)</p>
+              <p className="font-bold text-red-900">🔴 3 produtos venceram nas últimas 24 horas (MZN 450,00)</p>
               <p className="text-sm text-red-800 mt-1">🔴 5 produtos vencerão hoje</p>
             </div>
             <Button variant="outline" className="text-red-700 border-red-600">
@@ -51,7 +51,7 @@ export function ExpiryDashboardContent() {
               <p className="text-sm text-red-700 font-medium">🔴 VENCIDOS</p>
               <p className="text-4xl font-bold text-red-900">8</p>
               <p className="text-sm text-red-700">lotes</p>
-              <p className="text-lg font-bold text-red-900">R$ 2.450,00</p>
+              <p className="text-lg font-bold text-red-900">MZN 2.450,00</p>
               <Button size="sm" className="w-full bg-red-600 hover:bg-red-700 mt-2">
                 Ação Urgente
               </Button>
@@ -65,7 +65,7 @@ export function ExpiryDashboardContent() {
               <p className="text-sm text-orange-700 font-medium">🟠 ≤ 7 DIAS</p>
               <p className="text-4xl font-bold text-orange-900">15</p>
               <p className="text-sm text-orange-700">lotes</p>
-              <p className="text-lg font-bold text-orange-900">R$ 8.920,00</p>
+              <p className="text-lg font-bold text-orange-900">MZN 8.920,00</p>
               <p className="text-xs text-orange-700 mt-1">12% do estoque</p>
             </div>
           </CardContent>
@@ -77,7 +77,7 @@ export function ExpiryDashboardContent() {
               <p className="text-sm text-yellow-700 font-medium">🟡 ≤ 15 DIAS</p>
               <p className="text-4xl font-bold text-yellow-900">22</p>
               <p className="text-sm text-yellow-700">lotes</p>
-              <p className="text-lg font-bold text-yellow-900">R$ 15.300,00</p>
+              <p className="text-lg font-bold text-yellow-900">MZN 15.300,00</p>
               <p className="text-xs text-yellow-700 mt-1">18% do estoque</p>
             </div>
           </CardContent>
@@ -89,7 +89,7 @@ export function ExpiryDashboardContent() {
               <p className="text-sm text-yellow-600 font-medium">🟡 ≤ 30 DIAS</p>
               <p className="text-4xl font-bold text-yellow-800">35</p>
               <p className="text-sm text-yellow-600">lotes</p>
-              <p className="text-lg font-bold text-yellow-800">R$ 28.500,00</p>
+              <p className="text-lg font-bold text-yellow-800">MZN 28.500,00</p>
             </div>
           </CardContent>
         </Card>
@@ -100,7 +100,7 @@ export function ExpiryDashboardContent() {
               <p className="text-sm text-blue-700 font-medium">🔵 31-60 DIAS</p>
               <p className="text-4xl font-bold text-blue-900">48</p>
               <p className="text-sm text-blue-700">lotes</p>
-              <p className="text-lg font-bold text-blue-900">R$ 42.100,00</p>
+              <p className="text-lg font-bold text-blue-900">MZN 42.100,00</p>
             </div>
           </CardContent>
         </Card>
@@ -111,7 +111,7 @@ export function ExpiryDashboardContent() {
               <p className="text-sm text-imperial font-medium">🟢 61-90 DIAS</p>
               <p className="text-4xl font-bold text-imperial">92</p>
               <p className="text-sm text-imperial">lotes</p>
-              <p className="text-lg font-bold text-imperial">R$ 78.600,00</p>
+              <p className="text-lg font-bold text-imperial">MZN 78.600,00</p>
             </div>
           </CardContent>
         </Card>
@@ -124,7 +124,7 @@ export function ExpiryDashboardContent() {
             <CardTitle className="text-base">Valor Total em Risco</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-red-600">R$ 26.670,00</p>
+            <p className="text-3xl font-bold text-red-600">MZN 26.670,00</p>
             <p className="text-sm text-muted-foreground mt-1">15% do estoque total</p>
             <div className="flex items-center gap-1 mt-2 text-sm text-red-600">
               <TrendingUp className="h-4 w-4" />
@@ -295,9 +295,9 @@ export function ExpiryDashboardContent() {
                   <td className="p-2 text-right">
                     <p className="font-medium">25 kg</p>
                   </td>
-                  <td className="p-2 text-right">R$ 18,50</td>
+                  <td className="p-2 text-right">MZN 18,50</td>
                   <td className="p-2 text-right">
-                    <p className="font-bold">R$ 462,50</p>
+                    <p className="font-bold">MZN 462,50</p>
                   </td>
                   <td className="p-2 text-xs">ARM01 &gt; ZF</td>
                   <td className="p-2">
@@ -342,9 +342,9 @@ export function ExpiryDashboardContent() {
                   <td className="p-2 text-right">
                     <p className="font-medium">100 L</p>
                   </td>
-                  <td className="p-2 text-right">R$ 8,90</td>
+                  <td className="p-2 text-right">MZN 8,90</td>
                   <td className="p-2 text-right">
-                    <p className="font-bold">R$ 890,00</p>
+                    <p className="font-bold">MZN 890,00</p>
                   </td>
                   <td className="p-2 text-xs">ARM01 &gt; ZF</td>
                   <td className="p-2">
@@ -371,7 +371,7 @@ export function ExpiryDashboardContent() {
                 <span>Qtd Total: 850 unidades</span>
               </div>
               <div>
-                <span className="font-bold text-red-600">Valor Total em Risco: R$ 26.670,00</span>
+                <span className="font-bold text-red-600">Valor Total em Risco: MZN 26.670,00</span>
               </div>
             </div>
           </div>

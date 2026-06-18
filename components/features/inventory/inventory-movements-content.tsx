@@ -536,7 +536,7 @@ export function InventoryMovementsContent() {
               <p className="text-sm text-muted-foreground">📥 Entradas</p>
               <p className="text-xl font-bold text-imperial">{entriesCount} movimentações</p>
               <p className="text-sm text-muted-foreground mt-1">
-                Qtd: {entriesQty} un | R$ {entriesValue.toLocaleString("pt-BR")}
+                Qtd: {entriesQty} un | MZN {entriesValue.toLocaleString("pt-BR")}
               </p>
             </div>
           </CardContent>
@@ -548,7 +548,7 @@ export function InventoryMovementsContent() {
               <p className="text-sm text-muted-foreground">📤 Saídas</p>
               <p className="text-xl font-bold text-red-700">{exitsCount} movimentações</p>
               <p className="text-sm text-muted-foreground mt-1">
-                Qtd: {exitsQty} un | R$ {exitsValue.toLocaleString("pt-BR")}
+                Qtd: {exitsQty} un | MZN {exitsValue.toLocaleString("pt-BR")}
               </p>
             </div>
           </CardContent>
@@ -698,7 +698,7 @@ export function InventoryMovementsContent() {
                         </td>
                         <td className="px-4 py-3">
                           <div className="text-sm font-semibold">
-                            R$ {mov.totalValue.toLocaleString("pt-BR")}
+                            MZN {mov.totalValue.toLocaleString("pt-BR")}
                           </div>
                         </td>
                         <td className="px-4 py-3">
@@ -759,7 +759,7 @@ export function InventoryMovementsContent() {
                   {netBalance}
                 </td>
                 <td className="px-4 py-3 text-sm">
-                  R$ {(entriesValue + exitsValue).toLocaleString("pt-BR")}
+                  MZN {(entriesValue + exitsValue).toLocaleString("pt-BR")}
                 </td>
                 <td colSpan={2}></td>
               </tr>
@@ -889,12 +889,12 @@ export function InventoryMovementsContent() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label>Valor Unitário</Label>
-                      <div className="font-semibold">R$ {selectedMovement.unitValue.toFixed(2)}</div>
+                      <div className="font-semibold">MZN {selectedMovement.unitValue.toFixed(2)}</div>
                     </div>
                     <div>
                       <Label>Valor Total</Label>
                       <div className="text-xl font-bold text-imperial">
-                        R$ {selectedMovement.totalValue.toLocaleString("pt-BR")}
+                        MZN {selectedMovement.totalValue.toLocaleString("pt-BR")}
                       </div>
                     </div>
                   </div>

@@ -60,7 +60,7 @@ export function ReportsHubContent() {
                 </div>
                 <p className="text-sm text-muted-foreground">KPIs consolidados de todo o sistema</p>
                 <div className="space-y-1 text-xs">
-                  <p>Valor em Estoque: <span className="font-bold">R$ 185.420</span></p>
+                  <p>Valor em Estoque: <span className="font-bold">MZN 185.420</span></p>
                   <p>Movimentações Hoje: <span className="font-bold">42</span></p>
                   <p>Taxa de Atendimento: <span className="font-bold">96%</span></p>
                 </div>
@@ -82,8 +82,8 @@ export function ReportsHubContent() {
                 </div>
                 <p className="text-sm text-muted-foreground">Valor do estoque, custos, perdas</p>
                 <div className="space-y-1 text-xs">
-                  <p>Valor do Estoque: <span className="font-bold">R$ 185.420</span></p>
-                  <p>Perdas Este Mês: <span className="font-bold text-red-600">R$ 4.850</span></p>
+                  <p>Valor do Estoque: <span className="font-bold">MZN 185.420</span></p>
+                  <p>Perdas Este Mês: <span className="font-bold text-red-600">MZN 4.850</span></p>
                   <p>ROI Estoque: <span className="font-bold">18%</span></p>
                 </div>
                 <Button className="w-full bg-imperial hover:bg-imperial" size="sm">
@@ -126,7 +126,7 @@ export function ReportsHubContent() {
                 </div>
                 <p className="text-sm text-muted-foreground">Perdas, riscos, campanhas</p>
                 <div className="space-y-1 text-xs">
-                  <p>Em Risco: <span className="font-bold text-red-600">R$ 26.670</span></p>
+                  <p>Em Risco: <span className="font-bold text-red-600">MZN 26.670</span></p>
                   <p>Taxa de Perda: <span className="font-bold">1.8%</span></p>
                   <p>Campanhas Ativas: <span className="font-bold">5</span></p>
                 </div>
@@ -172,7 +172,7 @@ export function ReportsHubContent() {
             <ReportCard
               title="Estoque Parado"
               description="Produtos sem movimentação há > 90 dias"
-              kpi="R$ 8.450 parado"
+              kpi="MZN 8.450 parado"
               onGenerate={() => setShowReportModal(true)}
             />
             <ReportCard
@@ -235,13 +235,13 @@ export function ReportsHubContent() {
             <ReportCard
               title="Perdas por Vencimento"
               description="Valor e quantidade perdidos"
-              kpi="R$ 4.850 este mês"
+              kpi="MZN 4.850 este mês"
               onGenerate={() => setShowReportModal(true)}
             />
             <ReportCard
               title="Itens em Risco"
               description="Projeção de perdas por horizonte"
-              kpi="R$ 26.670 em risco"
+              kpi="MZN 26.670 em risco"
               onGenerate={() => setShowReportModal(true)}
             />
             <ReportCard
@@ -259,7 +259,7 @@ export function ReportsHubContent() {
             <ReportCard
               title="Descartes"
               description="Volume e valor de descartes"
-              kpi="R$ 4.850 descartado"
+              kpi="MZN 4.850 descartado"
               onGenerate={() => setShowReportModal(true)}
             />
             <ReportCard

@@ -358,7 +358,7 @@ export function PickingOrdersContent() {
             <div className="flex items-center justify-between">
               <div className="space-y-1">
                 <p className="text-sm text-muted-foreground">Valor a Expedir</p>
-                <p className="text-2xl font-bold">R$ {stats.totalValue.toFixed(2)}</p>
+                <p className="text-2xl font-bold">MZN {stats.totalValue.toFixed(2)}</p>
               </div>
               <DollarSign className="h-8 w-8 text-imperial" />
             </div>
@@ -615,7 +615,7 @@ export function PickingOrdersContent() {
                         )}
                       </td>
                       <td className="p-2 text-right">
-                        <p className="font-medium">R$ {order.totalValue.toFixed(2)}</p>
+                        <p className="font-medium">MZN {order.totalValue.toFixed(2)}</p>
                       </td>
                       <td className="p-2">{getStatusBadge(order.status)}</td>
                       <td className="p-2">

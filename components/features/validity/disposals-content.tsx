@@ -59,7 +59,7 @@ export function DisposalsContent() {
                     <p><span className="font-medium">Lote:</span> LOT2024-099</p>
                     <p><span className="font-medium">Validade:</span> 20/01/2025 (Vencido há 2 dias)</p>
                     <p><span className="font-medium">Quantidade:</span> 25 kg</p>
-                    <p><span className="font-medium">Valor:</span> R$ 462,50</p>
+                    <p><span className="font-medium">Valor:</span> MZN 462,50</p>
                   </div>
                 </CardContent>
               </Card>
@@ -233,15 +233,15 @@ export function DisposalsContent() {
                 <CardContent className="space-y-2">
                   <div className="flex justify-between">
                     <span className="text-sm">Valor do Produto:</span>
-                    <span className="font-bold">R$ 462,50</span>
+                    <span className="font-bold">MZN 462,50</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm">Custo de Descarte Estimado:</span>
-                    <span className="font-bold">R$ 35,00</span>
+                    <span className="font-bold">MZN 35,00</span>
                   </div>
                   <div className="flex justify-between border-t pt-2">
                     <span className="font-medium">Perda Total:</span>
-                    <span className="font-bold text-red-600">R$ 497,50</span>
+                    <span className="font-bold text-red-600">MZN 497,50</span>
                   </div>
                   <div className="space-y-2 pt-2">
                     <Label htmlFor="cost-center">Centro de Custo *</Label>
@@ -308,7 +308,7 @@ export function DisposalsContent() {
                 <AlertTriangle className="h-6 w-6 text-red-600 mt-0.5" />
                 <div className="flex-1">
                   <p className="font-bold text-red-900">8 produtos vencidos aguardando descarte</p>
-                  <p className="text-sm text-red-800 mt-1">Valor Total: R$ 2.450,00</p>
+                  <p className="text-sm text-red-800 mt-1">Valor Total: MZN 2.450,00</p>
                 </div>
                 <Button className="bg-red-600 hover:bg-red-700">
                   Iniciar Descarte em Lote
@@ -353,7 +353,7 @@ export function DisposalsContent() {
                         <p className="text-red-700 font-bold text-xs">Vencido há 2 dias</p>
                       </td>
                       <td className="p-2 text-right">25 kg</td>
-                      <td className="p-2 text-right font-bold">R$ 462,50</td>
+                      <td className="p-2 text-right font-bold">MZN 462,50</td>
                       <td className="p-2 text-xs">ARM01 &gt; ZF</td>
                       <td className="p-2">
                         <Badge variant="outline">Vencimento</Badge>
@@ -383,7 +383,7 @@ export function DisposalsContent() {
                         <p className="text-red-700 font-bold text-xs">Vencido hoje</p>
                       </td>
                       <td className="p-2 text-right">30 L</td>
-                      <td className="p-2 text-right font-bold">R$ 267,00</td>
+                      <td className="p-2 text-right font-bold">MZN 267,00</td>
                       <td className="p-2 text-xs">ARM01 &gt; ZF</td>
                       <td className="p-2">
                         <Badge variant="outline">Vencimento</Badge>
@@ -405,7 +405,7 @@ export function DisposalsContent() {
                     <span>Qtd Total: 145 unidades</span>
                   </div>
                   <div>
-                    <span className="font-bold text-red-600">Valor Total a Descartar: R$ 2.450,00</span>
+                    <span className="font-bold text-red-600">Valor Total a Descartar: MZN 2.450,00</span>
                   </div>
                 </div>
               </div>
@@ -428,7 +428,7 @@ export function DisposalsContent() {
               <CardContent className="pt-6">
                 <div>
                   <p className="text-sm text-muted-foreground">Valor Descartado</p>
-                  <p className="text-3xl font-bold text-red-600">R$ 4.850</p>
+                  <p className="text-3xl font-bold text-red-600">MZN 4.850</p>
                 </div>
               </CardContent>
             </Card>
@@ -491,7 +491,7 @@ export function DisposalsContent() {
                       </td>
                       <td className="p-2 font-mono text-xs">LOT2025-045</td>
                       <td className="p-2 text-right">10 kg</td>
-                      <td className="p-2 text-right font-bold">R$ 180,00</td>
+                      <td className="p-2 text-right font-bold">MZN 180,00</td>
                       <td className="p-2">
                         <Badge variant="outline">Vencimento</Badge>
                       </td>

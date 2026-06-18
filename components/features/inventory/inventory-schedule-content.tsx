@@ -634,7 +634,7 @@ export function InventoryScheduleContent() {
                         </td>
                         <td className="px-4 py-3">
                           <div className={`text-sm font-semibold ${div.totalValue > 0 ? "text-imperial" : "text-red-700"}`}>
-                            R$ {Math.abs(div.totalValue).toFixed(2)}
+                            MZN {Math.abs(div.totalValue).toFixed(2)}
                           </div>
                         </td>
                         <td className="px-4 py-3">

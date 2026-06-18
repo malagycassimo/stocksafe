@@ -377,7 +377,7 @@ export function NewInventoryContent() {
                   <div className="flex items-center gap-2">
                     <Checkbox id="highValue" />
                     <label htmlFor="highValue" className="cursor-pointer">
-                      Valor unitário &gt; R$
+                      Valor unitário &gt; MZN
                     </label>
                     <Input type="number" placeholder="100.00" className="w-32" />
                   </div>
