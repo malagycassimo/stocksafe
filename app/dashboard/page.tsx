@@ -8,6 +8,8 @@ import { RecebimentoDashboard } from "@/components/features/receiving/recebiment
 import { QADashboard } from "@/components/features/quality/qa-dashboard"
 import { AdminDashboard } from "@/components/features/admin/admin-dashboard"
 
+import { useAuth } from "@/hooks/useAuth"
+
 // Mock user profile - in production, this would come from auth context
 const MOCK_USER = {
   name: "João Silva",
@@ -17,7 +19,19 @@ const MOCK_USER = {
 }
 
 export default function DashboardPage() {
-  const [userProfile] = useState<"REQUISITANTE" | "COMPRAS" | "RECEBIMENTO" | "QA" | "ADMIN" | "FORNECEDOR">(MOCK_USER.profile)
+  const { user: authUser } = useAuth()
+
+  const getProfile = () => {
+    if (!authUser) return "REQUISITANTE"
+    const userRole = authUser.perfil as string
+    if (userRole === "ADMIN") return "ADMIN"
+    if (userRole === "COMPRAS_PROCUREMENT" || userRole === "COMPRAS") return "COMPRAS"
+    if (userRole === "RECEBIMENTO_ARMAZEM" || userRole === "RECEBIMENTO") return "RECEBIMENTO"
+    if (userRole === "QUALIDADE_QA" || userRole === "QA") return "QA"
+    return "REQUISITANTE"
+  }
+
+  const userProfile = getProfile()
 
   const renderDashboardContent = () => {
     switch (userProfile) {

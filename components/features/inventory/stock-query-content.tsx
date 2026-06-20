@@ -350,7 +350,7 @@ export function StockQueryContent() {
               <div>
                 <p className="text-sm text-muted-foreground">Valor Total em Estoque</p>
                 <p className="text-2xl font-bold text-emerald-700">
-                  R$ {totalValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                  {totalValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} MT
                 </p>
                 <div className="flex items-center gap-1 mt-1">
                   <TrendingUp className="w-3 h-3 text-green-600" />
@@ -546,11 +546,11 @@ export function StockQueryContent() {
                           </div>
                         </td>
                         <td className="px-4 py-3">
-                          <div className="text-sm">R$ {item.valor_unitario.toFixed(2)}</div>
+                          <div className="text-sm">{item.valor_unitario.toFixed(2)} MT</div>
                         </td>
                         <td className="px-4 py-3">
                           <div className="text-sm font-semibold">
-                            R$ {item.valor_total.toLocaleString("pt-BR")}
+                            {item.valor_total.toLocaleString("pt-BR")} MT
                           </div>
                         </td>
                         <td className="px-4 py-3">
@@ -618,7 +618,7 @@ export function StockQueryContent() {
                     </td>
                     <td colSpan={2}></td>
                     <td className="px-4 py-3 text-sm">
-                      R$ {totalValue.toLocaleString("pt-BR")}
+                      {totalValue.toLocaleString("pt-BR")} MT
                     </td>
                     <td colSpan={2}></td>
                   </tr>
@@ -673,7 +673,7 @@ export function StockQueryContent() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="text-sm font-semibold">
-                          R$ {group.totalValue.toLocaleString("pt-BR")}
+                          {group.totalValue.toLocaleString("pt-BR")} MT
                         </div>
                       </td>
                     </tr>
@@ -824,11 +824,11 @@ export function StockQueryContent() {
                 </div>
                 <div>
                   <Label className="text-muted-foreground">Valor Unitário</Label>
-                  <div className="text-sm mt-0.5">R$ {selectedLot.valor_unitario.toFixed(2)}</div>
+                  <div className="text-sm mt-0.5">{selectedLot.valor_unitario.toFixed(2)} MT</div>
                 </div>
                 <div>
                   <Label className="text-muted-foreground">Valor Total</Label>
-                  <div className="font-semibold text-sm mt-0.5">R$ {selectedLot.valor_total.toLocaleString("pt-BR")}</div>
+                  <div className="font-semibold text-sm mt-0.5">{selectedLot.valor_total.toLocaleString("pt-BR")} MT</div>
                 </div>
               </div>
               <div className="flex gap-2 pt-4 border-t mt-4">

@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import {
   Upload,
   Save,
@@ -33,6 +34,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
+import { recebimentoService } from "@/app/services/recebimentoService"
 
 // Mock data
 const mockReceiving = {
@@ -81,11 +83,19 @@ const mockPoItems = [
   },
 ]
 
-export function FiscalReceivingContent() {
+export function FiscalReceivingContent({ id }: { id?: string }) {
+  const router = useRouter()
   const { toast } = useToast()
   const [isSaving, setIsSaving] = useState(false)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [showRejectDialog, setShowRejectDialog] = useState(false)
+
+  const poIdFromQuery = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('po') : null
+  const poId = id || poIdFromQuery || "PO-2025-123"
+
+  const [po, setPo] = useState<any>(null)
+  const [poItems, setPoItems] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
 
   // Form state
   const [nfNumber, setNfNumber] = useState("")
@@ -100,7 +110,6 @@ export function FiscalReceivingContent() {
   const [uploadedDanfe, setUploadedDanfe] = useState<string | null>(null)
 
   // Values
-  const [subtotalPo] = useState(22750)
   const [subtotalNf, setSubtotalNf] = useState("22750")
   const [discountNf, setDiscountNf] = useState("0")
   const [freightNf, setFreightNf] = useState("500")
@@ -123,8 +132,42 @@ export function FiscalReceivingContent() {
   const [linkToPayable, setLinkToPayable] = useState(true)
   const [paymentTerms, setPaymentTerms] = useState("30 dias")
 
-  // Calculate totals
-  const totalPo = 25000
+  useEffect(() => {
+    if (!poId) return
+    setLoading(true)
+    recebimentoService.getPurchaseOrder(poId)
+      .then((data) => {
+        setPo(data)
+        if (data.itens && data.itens.length > 0) {
+          const mapped = data.itens.map((item: any) => ({
+            produtoId: item.produtoId,
+            sku: item.sku,
+            description: item.description,
+            qtyPo: item.qtyExpected,
+            qtyNf: item.qtyExpected,
+            qtyReceived: item.qtyExpected,
+            unitPricePo: item.price,
+            unitPriceNf: item.price,
+            subtotalNf: item.qtyExpected * item.price,
+          }))
+          setPoItems(mapped)
+          const subTotal = mapped.reduce((acc, curr) => acc + curr.subtotalNf, 0)
+          setSubtotalNf(subTotal.toString())
+        } else {
+          setPoItems(mockPoItems)
+        }
+      })
+      .catch((err) => {
+        console.error(err)
+        setPoItems(mockPoItems)
+      })
+      .finally(() => {
+        setLoading(false)
+      })
+  }, [poId])
+
+  const subtotalPo = poItems.reduce((acc, item) => acc + (item.qtyPo * item.unitPricePo), 0)
+  const totalPo = subtotalPo
   const totalNf =
     parseFloat(subtotalNf || "0") -
     parseFloat(discountNf || "0") +
@@ -138,7 +181,7 @@ export function FiscalReceivingContent() {
     parseFloat(otherTaxesNf || "0")
 
   const divergence = totalNf - totalPo
-  const divergencePercent = (Math.abs(divergence) / totalPo) * 100
+  const divergencePercent = totalPo > 0 ? (Math.abs(divergence) / totalPo) * 100 : 0
 
   const getDivergenceStatus = () => {
     if (Math.abs(divergence) < 0.01) {
@@ -233,15 +276,39 @@ export function FiscalReceivingContent() {
 
   const confirmApprove = () => {
     setIsSaving(true)
-    setTimeout(() => {
+
+    recebimentoService.submitConferencia({
+      poId: poId,
+      numeroNotaFiscal: nfNumber || "NF-99999",
+      valorTotalNf: totalNf,
+      itens: poItems.map(item => ({
+        produtoId: item.produtoId || "PROD-UUID-PLACEHOLDER",
+        quantidadePedido: item.qtyPo,
+        quantidadeNota: item.qtyNf,
+        quantidadeFisica: item.qtyReceived,
+        divergente: item.qtyNf !== item.qtyReceived
+      }))
+    })
+    .then((res) => {
       setIsSaving(false)
       setShowConfirmDialog(false)
       toast({
-        title: "GRN gerado com sucesso!",
-        description: "Código: GRN-2025-001",
+        title: "Conferência Fiscal Concluída!",
+        description: `Status: ${res.status}. Divergência Total: ${res.divergenciaTotal} MT`,
       })
-      // Redirect would happen here
-    }, 1500)
+      setTimeout(() => {
+        router.push("/recebimento/aguardando")
+      }, 1500)
+    })
+    .catch((err) => {
+      console.error(err)
+      setIsSaving(false)
+      toast({
+        title: "Erro ao submeter conferência",
+        description: err.response?.data?.message || err.message,
+        variant: "destructive"
+      })
+    })
   }
 
   const handleReject = () => {
@@ -327,7 +394,7 @@ export function FiscalReceivingContent() {
             </div>
             <div>
               <Label>Valor do PO</Label>
-              <div className="font-medium">R$ {totalPo.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</div>
+              <div className="font-medium">{totalPo.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} MT</div>
             </div>
             <div>
               <Label>Qtd de Itens</Label>
@@ -520,7 +587,7 @@ export function FiscalReceivingContent() {
               <tbody>
                 <tr>
                   <td className="border px-4 py-2 text-sm">Subtotal Produtos</td>
-                  <td className="border px-4 py-2 text-right text-sm">R$ {subtotalPo.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</td>
+                  <td className="border px-4 py-2 text-right text-sm">{subtotalPo.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} MT</td>
                   <td className="border px-4 py-2 text-right">
                     <Input
                       type="number"
@@ -540,7 +607,7 @@ export function FiscalReceivingContent() {
                 </tr>
                 <tr>
                   <td className="border px-4 py-2 text-sm">Desconto</td>
-                  <td className="border px-4 py-2 text-right text-sm">R$ 0,00</td>
+                  <td className="border px-4 py-2 text-right text-sm">0,00 MT</td>
                   <td className="border px-4 py-2 text-right">
                     <Input
                       type="number"
@@ -556,7 +623,7 @@ export function FiscalReceivingContent() {
                 </tr>
                 <tr>
                   <td className="border px-4 py-2 text-sm">Frete</td>
-                  <td className="border px-4 py-2 text-right text-sm">R$ 500,00</td>
+                  <td className="border px-4 py-2 text-right text-sm">500,00 MT</td>
                   <td className="border px-4 py-2 text-right">
                     <Input
                       type="number"
@@ -572,7 +639,7 @@ export function FiscalReceivingContent() {
                 </tr>
                 <tr>
                   <td className="border px-4 py-2 text-sm">Seguro</td>
-                  <td className="border px-4 py-2 text-right text-sm">R$ 100,00</td>
+                  <td className="border px-4 py-2 text-right text-sm">100,00 MT</td>
                   <td className="border px-4 py-2 text-right">
                     <Input
                       type="number"
@@ -588,7 +655,7 @@ export function FiscalReceivingContent() {
                 </tr>
                 <tr>
                   <td className="border px-4 py-2 text-sm">Outras Despesas</td>
-                  <td className="border px-4 py-2 text-right text-sm">R$ 50,00</td>
+                  <td className="border px-4 py-2 text-right text-sm">50,00 MT</td>
                   <td className="border px-4 py-2 text-right">
                     <Input
                       type="number"
@@ -604,7 +671,7 @@ export function FiscalReceivingContent() {
                 </tr>
                 <tr>
                   <td className="border px-4 py-2 text-sm">IVA/ICMS</td>
-                  <td className="border px-4 py-2 text-right text-sm">R$ 1.650,00</td>
+                  <td className="border px-4 py-2 text-right text-sm">1.650,00 MT</td>
                   <td className="border px-4 py-2 text-right">
                     <Input
                       type="number"
@@ -621,14 +688,14 @@ export function FiscalReceivingContent() {
                 <tr className="bg-twilight font-semibold">
                   <td className="border px-4 py-3 text-sm">TOTAL GERAL</td>
                   <td className="border px-4 py-3 text-right text-lg">
-                    R$ {totalPo.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    {totalPo.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} MT
                   </td>
                   <td className="border px-4 py-3 text-right text-lg">
-                    R$ {totalNf.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    {totalNf.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} MT
                   </td>
                   <td className="border px-4 py-3 text-center">
                     <div className="text-lg font-bold">
-                      R$ {Math.abs(divergence).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                      {Math.abs(divergence).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} MT
                     </div>
                     <div className="text-xs">{divergencePercent.toFixed(2)}%</div>
                   </td>
@@ -644,7 +711,7 @@ export function FiscalReceivingContent() {
               <div className="font-semibold">{status.text}</div>
               {divergence !== 0 && (
                 <div className="text-sm mt-1">
-                  Diferença de R$ {Math.abs(divergence).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} (
+                  Diferença de {Math.abs(divergence).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} MT (
                   {divergencePercent.toFixed(2)}%)
                 </div>
               )}
@@ -674,41 +741,56 @@ export function FiscalReceivingContent() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {mockPoItems.map((item) => (
-                  <tr key={item.sku} className="hover:bg-gray-50">
-                    <td className="px-4 py-2">
-                      <div className="font-mono text-sm font-medium">{item.sku}</div>
-                      <div className="text-xs text-muted-foreground">{item.description}</div>
-                    </td>
-                    <td className="px-4 py-2 text-center text-sm">{item.qtyPo}</td>
-                    <td className="px-4 py-2 text-center">
-                      <Input type="number" value={item.qtyNf} className="w-20 text-center" readOnly />
-                    </td>
-                    <td className="px-4 py-2 text-center text-sm font-medium">{item.qtyReceived}</td>
-                    <td className="px-4 py-2 text-right text-sm">
-                      R$ {item.unitPricePo.toFixed(2)}
-                    </td>
-                    <td className="px-4 py-2 text-right">
-                      <Input
-                        type="number"
-                        value={item.unitPriceNf}
-                        className="w-24 text-right"
-                        step="0.01"
-                        readOnly
-                      />
-                    </td>
-                    <td className="px-4 py-2 text-right text-sm font-medium">
-                      R$ {item.subtotalNf.toLocaleString("pt-BR")}
-                    </td>
-                    <td className="px-4 py-2 text-center">
-                      {item.qtyNf === item.qtyReceived && item.unitPricePo === item.unitPriceNf ? (
-                        <Badge className="bg-twilight text-imperial">✅ Conforme</Badge>
-                      ) : (
-                        <Badge variant="destructive">❌ Divergente</Badge>
-                      )}
+                {loading ? (
+                  <tr>
+                    <td colSpan={8} className="text-center py-6 text-muted-foreground">
+                      <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2 text-imperial" />
+                      Carregando itens do pedido...
                     </td>
                   </tr>
-                ))}
+                ) : poItems.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="text-center py-6 text-muted-foreground">
+                      Nenhum item encontrado.
+                    </td>
+                  </tr>
+                ) : (
+                  poItems.map((item) => (
+                    <tr key={item.sku} className="hover:bg-gray-50">
+                      <td className="px-4 py-2">
+                        <div className="font-mono text-sm font-medium">{item.sku}</div>
+                        <div className="text-xs text-muted-foreground">{item.description}</div>
+                      </td>
+                      <td className="px-4 py-2 text-center text-sm">{item.qtyPo}</td>
+                      <td className="px-4 py-2 text-center">
+                        <Input type="number" value={item.qtyNf} className="w-20 text-center" readOnly />
+                      </td>
+                      <td className="px-4 py-2 text-center text-sm font-medium">{item.qtyReceived}</td>
+                      <td className="px-4 py-2 text-right text-sm">
+                        {item.unitPricePo.toFixed(2)} MT
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        <Input
+                          type="number"
+                          value={item.unitPriceNf}
+                          className="w-24 text-right"
+                          step="0.01"
+                          readOnly
+                        />
+                      </td>
+                      <td className="px-4 py-2 text-right text-sm font-medium">
+                        {item.subtotalNf.toLocaleString("pt-BR")} MT
+                      </td>
+                      <td className="px-4 py-2 text-center">
+                        {item.qtyNf === item.qtyReceived && item.unitPricePo === item.unitPriceNf ? (
+                          <Badge className="bg-twilight text-imperial">✅ Conforme</Badge>
+                        ) : (
+                          <Badge variant="destructive">❌ Divergente</Badge>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -885,16 +967,16 @@ export function FiscalReceivingContent() {
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Total NF:</span>
-                <span className="font-semibold">R$ {totalNf.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
+                <span className="font-semibold">{totalNf.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} MT</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Total PO:</span>
-                <span className="font-semibold">R$ {totalPo.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
+                <span className="font-semibold">{totalPo.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} MT</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Divergência:</span>
                 <span className={`font-semibold ${divergence === 0 ? "text-imperial" : "text-orange-600"}`}>
-                  R$ {Math.abs(divergence).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                  {Math.abs(divergence).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} MT
                 </span>
               </div>
               <div className="flex justify-between">

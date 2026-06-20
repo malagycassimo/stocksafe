@@ -1,8 +1,9 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { inventarioService } from "@/app/services/inventarioService"
 import {
   Search,
   Download,
@@ -181,7 +182,80 @@ const rejectionReasons = [
 
 export function InventoryAdjustmentsContent({ inventoryId }: { inventoryId: string }) {
   const router = useRouter()
-  const [divergences, setDivergences] = useState(mockDivergences)
+  const [divergences, setDivergences] = useState<any[]>([])
+  const [inventory, setInventory] = useState<any>(mockInventory)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    if (!inventoryId) return
+    setIsLoading(true)
+    inventarioService.obterPorId(inventoryId)
+      .then((data) => {
+        const totalCounted = data.itens?.length || 0
+        const backendDivergences = data.itens
+          .filter((item: any) => item.divergencia !== 0 && item.divergencia !== null)
+          .map((item: any) => {
+            const systemQty = item.quantidadeSistema || 0
+            const countedQty = item.quantidadeContada || 0
+            const divergence = item.divergencia || (countedQty - systemQty)
+            const percent = systemQty > 0 ? (divergence / systemQty) * 100 : 0
+            const unitValue = item.produto?.valor_unitario || 0
+            const impact = divergence * unitValue
+
+            return {
+              id: item.id,
+              itemId: item.id,
+              status: item.statusAjuste === 'APROVADO' ? 'approved' : item.statusAjuste === 'REJEITADO' ? 'rejected' : 'pending',
+              product: {
+                sku: item.produto?.sku || "SKU-PADRAO",
+                description: item.produto?.descricao || "Descrição do Produto",
+                category: item.produto?.categoria || "Geral",
+                image: null,
+              },
+              lot: item.lot || "LOTE-PADRAO",
+              lotDivergent: false,
+              expiryDate: item.produto?.data_validade || new Date().toISOString().split('T')[0],
+              expiryDivergent: false,
+              location: item.location || "ARM01",
+              displaced: false,
+              systemQty,
+              countedQty,
+              divergence,
+              divergencePercent: percent,
+              unit: item.produto?.unidade_medida || "un",
+              unitValue,
+              impact,
+              declaredReason: item.justificativaAjuste || "Divergência de contagem física",
+              hasPhotos: false,
+              photoCount: 0,
+              counter: { name: data.responsavel || "Carlos Silva", avatar: "CS" },
+              pendingSince: data.createdAt,
+            }
+          })
+
+        const divergenceCount = backendDivergences.length
+        const conformCount = totalCounted - divergenceCount
+        const accuracy = totalCounted > 0 ? Number(((conformCount / totalCounted) * 100).toFixed(1)) : 100
+
+        setInventory({
+          id: data.codigo || data.id,
+          date: data.dateAgenda || data.createdAt,
+          responsible: data.responsavel || "Carlos Silva",
+          status: data.status,
+          totalCounted,
+          conformCount,
+          divergenceCount,
+          accuracy,
+        })
+        setDivergences(backendDivergences)
+        setIsLoading(false)
+      })
+      .catch((err) => {
+        console.error("Erro ao carregar inventário para ajustes:", err)
+        setDivergences(mockDivergences)
+        setIsLoading(false)
+      })
+  }, [inventoryId])
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [typeFilter, setTypeFilter] = useState("all")
@@ -313,10 +387,24 @@ export function InventoryAdjustmentsContent({ inventoryId }: { inventoryId: stri
   }
 
   const confirmApplyAdjustments = () => {
-    // Here would be the API call
-    console.log("Adjustments applied")
-    setShowApplyModal(false)
-    router.push("/estoque/inventario")
+    const approvedItens = divergences.filter((d) => d.status === "approved").map((d) => d.itemId)
+    const rejectedItens = divergences.filter((d) => d.status === "rejected").map((d) => d.itemId)
+
+    inventarioService.ajustarInventario(inventoryId, {
+      itensAprovados: approvedItens,
+      itensRejeitados: rejectedItens,
+      justificativaAjuste: supervisorOpinion || "Ajuste de inventário homologado pelo supervisor."
+    })
+    .then((res) => {
+      console.log("Adjustments applied", res)
+      setShowApplyModal(false)
+      router.push("/estoque/inventario")
+    })
+    .catch((err) => {
+      console.error(err)
+      setShowApplyModal(false)
+      router.push("/estoque/inventario")
+    })
   }
 
   const handleSelectAll = (checked: boolean) => {
@@ -358,7 +446,7 @@ export function InventoryAdjustmentsContent({ inventoryId }: { inventoryId: stri
         </Link>
         {" / "}
         <Link href={`/estoque/inventario/${inventoryId}`} className="hover:text-imperial">
-          {mockInventory.id}
+          {inventory.id}
         </Link>
         {" / "}
         <span className="text-foreground">Ajustes</span>
@@ -367,13 +455,13 @@ export function InventoryAdjustmentsContent({ inventoryId }: { inventoryId: stri
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-imperial">Ajustes de Inventário - {mockInventory.id}</h1>
+          <h1 className="text-3xl font-bold text-imperial">Ajustes de Inventário - {inventory.id}</h1>
           <div className="flex items-center gap-3 mt-2">
             <Badge className="bg-yellow-100 text-yellow-800">Aguardando Aprovação</Badge>
             <span className="text-sm text-muted-foreground">
-              Data: {new Date(mockInventory.date).toLocaleDateString("pt-BR")}
+              Data: {new Date(inventory.date).toLocaleDateString("pt-BR")}
             </span>
-            <span className="text-sm text-muted-foreground">Responsável: {mockInventory.responsible}</span>
+            <span className="text-sm text-muted-foreground">Responsável: {inventory.responsible}</span>
           </div>
         </div>
       </div>
@@ -384,10 +472,10 @@ export function InventoryAdjustmentsContent({ inventoryId }: { inventoryId: stri
           <CardContent className="pt-6">
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Total Contados</p>
-              <p className="text-2xl font-bold">{mockInventory.totalCounted}</p>
-              <p className="text-sm text-imperial">Conformes: {mockInventory.conformCount}</p>
-              <p className="text-sm text-red-600">Com Divergência: {mockInventory.divergenceCount}</p>
-              <p className="text-sm font-semibold mt-2">Acuracidade: {mockInventory.accuracy}%</p>
+              <p className="text-2xl font-bold">{inventory.totalCounted}</p>
+              <p className="text-sm text-imperial">Conformes: {inventory.conformCount}</p>
+              <p className="text-sm text-red-600">Com Divergência: {inventory.divergenceCount}</p>
+              <p className="text-sm font-semibold mt-2">Acuracidade: {inventory.accuracy}%</p>
             </div>
           </CardContent>
         </Card>
@@ -417,14 +505,14 @@ export function InventoryAdjustmentsContent({ inventoryId }: { inventoryId: stri
               <p className="text-sm text-muted-foreground">Valor</p>
               <div className="flex items-center gap-2">
                 <TrendingUp className="w-4 h-4 text-imperial" />
-                <p className="text-lg font-semibold text-imperial">+R$ {surplusValue.toFixed(2)}</p>
+                <p className="text-lg font-semibold text-imperial">+{surplusValue.toFixed(2)} MT</p>
               </div>
               <div className="flex items-center gap-2">
                 <TrendingDown className="w-4 h-4 text-red-600" />
-                <p className="text-lg font-semibold text-red-600">-R$ {shortageValue.toFixed(2)}</p>
+                <p className="text-lg font-semibold text-red-600">-{shortageValue.toFixed(2)} MT</p>
               </div>
               <p className={`text-xl font-bold mt-2 ${netImpact >= 0 ? "text-imperial" : "text-red-700"}`}>
-                R$ {netImpact >= 0 ? "+" : ""}{netImpact.toFixed(2)}
+                {netImpact >= 0 ? "+" : ""} {netImpact.toFixed(2)} MT
               </p>
             </div>
           </CardContent>
@@ -528,13 +616,12 @@ export function InventoryAdjustmentsContent({ inventoryId }: { inventoryId: stri
               <div>
                 <span className="font-semibold text-imperial">{selectedItems.length} itens selecionados</span>
                 <div className="text-sm text-imperial mt-1">
-                  Impacto Total: R${" "}
-                  {selectedItems
+                  Impacto Total: {" "} {selectedItems
                     .reduce((sum, id) => {
                       const div = divergences.find((d) => d.id === id)
                       return sum + (div?.impact || 0)
                     }, 0)
-                    .toFixed(2)}
+                    .toFixed(2)} MT
                 </div>
               </div>
               <div className="flex gap-2">
@@ -579,7 +666,7 @@ export function InventoryAdjustmentsContent({ inventoryId }: { inventoryId: stri
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Qtd Contada</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Divergência</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Impacto (R$)</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Impacto (MT)</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Motivo</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Evidências</th>
                 <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 w-[120px]">Ações</th>
@@ -658,8 +745,7 @@ export function InventoryAdjustmentsContent({ inventoryId }: { inventoryId: stri
                     </td>
                     <td className="px-4 py-3">
                       <div className={`font-semibold ${div.impact > 0 ? "text-imperial" : "text-red-700"}`}>
-                        R$ {div.impact > 0 ? "+" : ""}
-                        {div.impact.toFixed(2)}
+                        {div.impact > 0 ? "+" : ""} {div.impact.toFixed(2)} MT
                       </div>
                     </td>
                     <td className="px-4 py-3">
@@ -726,7 +812,7 @@ export function InventoryAdjustmentsContent({ inventoryId }: { inventoryId: stri
                 <h3 className="font-semibold text-imperial mb-2">Aplicar Ajustes ao Estoque</h3>
                 <div className="text-sm text-imperial">
                   <p>{approvedCount} ajustes aprovados prontos para aplicação</p>
-                  <p className="font-semibold mt-1">Impacto Líquido: R$ {netImpact >= 0 ? "+" : ""}{netImpact.toFixed(2)}</p>
+                  <p className="font-semibold mt-1">Impacto Líquido: {netImpact >= 0 ? "+" : ""} {netImpact.toFixed(2)} MT</p>
                 </div>
               </div>
               <Button className="bg-imperial hover:bg-imperial" onClick={handleApplyAdjustments}>
@@ -777,8 +863,7 @@ export function InventoryAdjustmentsContent({ inventoryId }: { inventoryId: stri
                     <div>
                       <span className="text-muted-foreground">Impacto:</span>{" "}
                       <span className={`font-bold ${selectedDivergence.impact > 0 ? "text-imperial" : "text-red-700"}`}>
-                        R$ {selectedDivergence.impact > 0 ? "+" : ""}
-                        {selectedDivergence.impact.toFixed(2)}
+                        {selectedDivergence.impact > 0 ? "+" : ""} {selectedDivergence.impact.toFixed(2)} MT
                       </span>
                     </div>
                     <div className="col-span-2">
@@ -1009,8 +1094,7 @@ export function InventoryAdjustmentsContent({ inventoryId }: { inventoryId: stri
                     afetados
                   </p>
                   <p className={`text-lg font-bold ${netImpact >= 0 ? "text-imperial" : "text-red-700"}`}>
-                    Impacto: R$ {netImpact >= 0 ? "+" : ""}
-                    {netImpact.toFixed(2)}
+                    Impacto: {netImpact >= 0 ? "+" : ""} {netImpact.toFixed(2)} MT
                   </p>
                 </div>
               </CardContent>

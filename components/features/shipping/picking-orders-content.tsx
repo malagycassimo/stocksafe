@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
+import { expedicaoService } from "@/app/services/expedicaoService"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -61,7 +62,60 @@ interface PickingOrder {
 }
 
 export function PickingOrdersContent() {
-  const [orders, setOrders] = useState<PickingOrder[]>([
+  const [orders, setOrders] = useState<PickingOrder[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    setIsLoading(true)
+    expedicaoService.listPickingOrders()
+      .then((data) => {
+        if (!data || data.length === 0) {
+          setOrders(defaultMockOrders)
+          setIsLoading(false)
+          return
+        }
+
+        const mapped = data.map((o: any) => {
+          const itemCount = o.itens?.length || 0
+          const pickedCount = o.itens?.filter((i: any) => i.quantidadeSeparada !== null && i.quantidadeSeparada > 0).length || 0
+          
+          let status: OrderStatus = 'new'
+          if (o.status === 'SEPARADO') status = 'picked'
+          else if (o.status === 'EXPEDIDO') status = 'shipped'
+          else if (o.status === 'CANCELADO') status = 'cancelled'
+          else if (o.status === 'EM_ANDAMENTO' || o.status === 'SEPARANDO' || pickedCount > 0) status = 'in_progress'
+
+          return {
+            id: o.id,
+            number: o.codigo || o.id,
+            createdDate: o.createdAt?.split('T')[0] || new Date().toISOString().split('T')[0],
+            expectedShipDate: o.prazo?.split('T')[0] || new Date(Date.now() + 24*60*60*1000).toISOString().split('T')[0],
+            destination: {
+              name: o.solicitante || "Cliente Geral",
+              city: "Maputo",
+              type: "customer" as const
+            },
+            itemCount,
+            pickedItems: pickedCount,
+            totalItems: itemCount,
+            fefoAlerts: o.fefoViolado ? 1 : 0,
+            totalValue: o.itens?.reduce((sum: number, item: any) => sum + (item.quantidade * (item.produto?.valor_unitario || 100)), 0) || 0,
+            status,
+            priority: "normal" as const,
+            picker: o.status !== 'PENDENTE' ? { name: "Operador Padrão", avatar: "OP" } : null
+          }
+        })
+        setOrders(mapped)
+        setIsLoading(false)
+      })
+      .catch((err) => {
+        console.error("Erro ao listar ordens de picking:", err)
+        setOrders(defaultMockOrders)
+        setIsLoading(false)
+      })
+  }, [])
+
+  const defaultMockOrders: PickingOrder[] = [
     {
       id: "1",
       number: "ORD-001",
@@ -147,7 +201,7 @@ export function PickingOrdersContent() {
         avatar: "PC",
       },
     },
-  ])
+  ]
 
   // Filters
   const [searchTerm, setSearchTerm] = useState("")
@@ -358,7 +412,7 @@ export function PickingOrdersContent() {
             <div className="flex items-center justify-between">
               <div className="space-y-1">
                 <p className="text-sm text-muted-foreground">Valor a Expedir</p>
-                <p className="text-2xl font-bold">R$ {stats.totalValue.toFixed(2)}</p>
+                <p className="text-2xl font-bold">{stats.totalValue.toFixed(2)} MT</p>
               </div>
               <DollarSign className="h-8 w-8 text-imperial" />
             </div>
@@ -615,7 +669,7 @@ export function PickingOrdersContent() {
                         )}
                       </td>
                       <td className="p-2 text-right">
-                        <p className="font-medium">R$ {order.totalValue.toFixed(2)}</p>
+                        <p className="font-medium">{order.totalValue.toFixed(2)} MT</p>
                       </td>
                       <td className="p-2">{getStatusBadge(order.status)}</td>
                       <td className="p-2">

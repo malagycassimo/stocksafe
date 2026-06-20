@@ -53,7 +53,7 @@ export function WorkflowsContent() {
                     <Label htmlFor="rule-name">Nome da Regra *</Label>
                     <Input
                       id="rule-name"
-                      placeholder="Ex: Compras acima de R$ 10.000"
+                      placeholder="Ex: Compras acima de 10.000 MT"
                     />
                   </div>
 
@@ -140,7 +140,7 @@ export function WorkflowsContent() {
                       </Button>
 
                       <div className="p-2 bg-twilight rounded text-sm">
-                        <span className="font-medium">Exemplo:</span> Valor Total ≥ R$ 10.000 E Categoria = "Frescos"
+                        <span className="font-medium">Exemplo:</span> Valor Total ≥ 10.000 MT E Categoria = "Frescos"
                       </div>
                     </CardContent>
                   </Card>
@@ -268,8 +268,8 @@ export function WorkflowsContent() {
                   </thead>
                   <tbody>
                     <tr className="border-b hover:bg-muted/50">
-                      <td className="p-2 font-medium">Compras &gt; R$ 10.000</td>
-                      <td className="p-2 text-sm">Valor Total ≥ R$ 10.000</td>
+                      <td className="p-2 font-medium">Compras &gt; 10.000 MT</td>
+                      <td className="p-2 text-sm">Valor Total ≥ 10.000 MT</td>
                       <td className="p-2">
                         <div className="text-sm">
                           <p className="font-medium">João Silva</p>
@@ -301,7 +301,7 @@ export function WorkflowsContent() {
 
                     <tr className="border-b hover:bg-muted/50">
                       <td className="p-2 font-medium">Compras Frescos</td>
-                      <td className="p-2 text-sm">Categoria = "Frescos" E Valor ≥ R$ 5.000</td>
+                      <td className="p-2 text-sm">Categoria = "Frescos" E Valor ≥ 5.000 MT</td>
                       <td className="p-2">
                         <div className="text-sm">
                           <p className="font-medium">Pedro Costa</p>
@@ -346,7 +346,7 @@ export function WorkflowsContent() {
             <CardContent>
               <div className="space-y-2 text-sm">
                 <p>• Desvio de validade &gt; 10% requer aprovação QA</p>
-                <p>• Rejeição &gt; R$ 5.000 requer aprovação Gerência</p>
+                <p>• Rejeição &gt; 5.000 MT requer aprovação Gerência</p>
                 <p>• Aceite com desvio sempre requer aprovação</p>
               </div>
             </CardContent>
@@ -393,7 +393,7 @@ export function WorkflowsContent() {
 
                     <tr className="border-b hover:bg-muted/50">
                       <td className="p-2 font-medium">Rejeição Alto Valor</td>
-                      <td className="p-2 text-sm">Valor da Rejeição &gt; R$ 5.000</td>
+                      <td className="p-2 text-sm">Valor da Rejeição &gt; 5.000 MT</td>
                       <td className="p-2">
                         <div className="text-sm">
                           <p className="font-medium">Gerente de Compras</p>
@@ -433,7 +433,7 @@ export function WorkflowsContent() {
             </CardHeader>
             <CardContent>
               <div className="space-y-2 text-sm">
-                <p>• Ajuste &gt; R$ 1.000 requer aprovação Gerente</p>
+                <p>• Ajuste &gt; 1.000 MT requer aprovação Gerente</p>
                 <p>• Ajuste negativo &gt; 20% do saldo requer 2 aprovações</p>
                 <p>• Movimentação manual sempre requer aprovação</p>
                 <p>• Correção de lote/validade requer aprovação QA</p>
@@ -457,7 +457,7 @@ export function WorkflowsContent() {
                   <tbody>
                     <tr className="border-b hover:bg-muted/50">
                       <td className="p-2 font-medium">Ajuste Alto Valor</td>
-                      <td className="p-2 text-sm">Valor do Ajuste &gt; R$ 1.000</td>
+                      <td className="p-2 text-sm">Valor do Ajuste &gt; 1.000 MT</td>
                       <td className="p-2">
                         <div className="text-sm">
                           <p className="font-medium">Gerente de Estoque</p>
@@ -497,7 +497,7 @@ export function WorkflowsContent() {
             </CardHeader>
             <CardContent>
               <div className="space-y-2 text-sm">
-                <p>• Descarte &gt; R$ 500 requer aprovação</p>
+                <p>• Descarte &gt; 500 MT requer aprovação</p>
                 <p>• Descarte especial/incineração sempre requer aprovação QA + Gerência</p>
                 <p>• Descarte de produtos não vencidos requer justificativa + 2 aprovações</p>
               </div>
@@ -520,7 +520,7 @@ export function WorkflowsContent() {
                   <tbody>
                     <tr className="border-b hover:bg-muted/50">
                       <td className="p-2 font-medium">Descarte Alto Valor</td>
-                      <td className="p-2 text-sm">Valor &gt; R$ 500</td>
+                      <td className="p-2 text-sm">Valor &gt; 500 MT</td>
                       <td className="p-2">
                         <div className="text-sm">
                           <p className="font-medium">Gerente</p>
@@ -593,10 +593,10 @@ export function WorkflowsContent() {
               <thead>
                 <tr className="border-b">
                   <th className="text-left p-2">Operação</th>
-                  <th className="text-center p-2 bg-twilight">&lt; R$ 1K</th>
-                  <th className="text-center p-2 bg-yellow-50">R$ 1-5K</th>
-                  <th className="text-center p-2 bg-orange-50">R$ 5-10K</th>
-                  <th className="text-center p-2 bg-red-50">&gt; R$ 10K</th>
+                  <th className="text-center p-2 bg-twilight">&lt; 1K MT</th>
+                  <th className="text-center p-2 bg-yellow-50">1-5K MT</th>
+                  <th className="text-center p-2 bg-orange-50">5-10K MT</th>
+                  <th className="text-center p-2 bg-red-50">&gt; 10K MT</th>
                 </tr>
               </thead>
               <tbody>

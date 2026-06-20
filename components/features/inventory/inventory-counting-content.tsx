@@ -36,6 +36,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog"
+import { inventarioService } from "@/app/services/inventarioService"
 
 // Mock data
 const mockInventory = {
@@ -113,11 +114,13 @@ const statusBadges = {
 
 export function InventoryCountingContent({ inventoryId }: { inventoryId: string }) {
   const router = useRouter()
-  const [items, setItems] = useState(mockItems)
+  const [items, setItems] = useState<any[]>([])
+  const [inventory, setInventory] = useState<any>(mockInventory)
+  const [isLoading, setIsLoading] = useState(true)
   const [scanCode, setScanCode] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [showFilters, setShowFilters] = useState(false)
-  const [selectedItem, setSelectedItem] = useState<typeof mockItems[0] | null>(null)
+  const [selectedItem, setSelectedItem] = useState<any | null>(null)
   const [showCountingCard, setShowCountingCard] = useState(false)
   const [elapsedTime, setElapsedTime] = useState(0)
   const [showFinalizeModal, setShowFinalizeModal] = useState(false)
@@ -133,13 +136,60 @@ export function InventoryCountingContent({ inventoryId }: { inventoryId: string 
   const [actualLocation, setActualLocation] = useState("")
   const [observations, setObservations] = useState("")
 
-  // Timer
+  // Timer & Loading
   useEffect(() => {
     const interval = setInterval(() => {
       setElapsedTime((prev) => prev + 1)
     }, 1000)
     return () => clearInterval(interval)
   }, [])
+
+  useEffect(() => {
+    if (!inventoryId) return
+    setIsLoading(true)
+    inventarioService.obterPorId(inventoryId)
+      .then((data) => {
+        setInventory({
+          id: data.codigo || data.id,
+          type: data.type || "general",
+          scope: data.scope || "Inventário Geral",
+          responsible: {
+            name: data.responsavel || "Supervisor Padrão",
+            avatar: (data.responsavel || "SP").split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()
+          },
+          startedAt: data.createdAt,
+          totalItems: data.itens?.length || 0
+        })
+
+        const mapped = data.itens.map((item: any) => {
+          return {
+            id: item.produtoId || item.produto?.id || item.id,
+            product: {
+              sku: item.produto?.sku || "SKU-PADRAO",
+              description: item.produto?.descricao || "Descrição do Produto",
+              category: item.produto?.categoria || "Geral",
+              image: null,
+            },
+            lot: item.lot || "LOTE-PADRAO",
+            expiryDate: item.produto?.data_validade || new Date(Date.now() + 15*24*60*60*1000).toISOString().split('T')[0],
+            daysToExpiry: item.produto?.dias_restantes || 15,
+            location: item.location || "ARM01",
+            systemQty: item.quantidadeSistema || 0,
+            unit: item.produto?.unidade_medida || "un",
+            unitValue: item.produto?.valor_unitario || 0,
+            status: item.quantidadeContada !== null ? (item.divergencia !== 0 ? "divergence" : "counted") : "pending",
+            countedQty: item.quantidadeContada,
+          }
+        })
+        setItems(mapped)
+        setIsLoading(false)
+      })
+      .catch((err) => {
+        console.error("Erro ao carregar inventário:", err)
+        setItems(mockItems)
+        setIsLoading(false)
+      })
+  }, [inventoryId])
 
   const formatTime = (seconds: number) => {
     const hrs = Math.floor(seconds / 3600)
@@ -222,9 +272,24 @@ export function InventoryCountingContent({ inventoryId }: { inventoryId: string 
   }
 
   const confirmFinalize = () => {
-    // Here would be the API call
-    console.log("Inventory finalized")
-    router.push("/estoque/inventario")
+    const payloadItens = items
+      .filter((i) => i.countedQty !== null)
+      .map((i) => ({
+        produtoId: i.id,
+        quantidadeContada: i.countedQty || 0
+      }))
+
+    inventarioService.submeterContagem(inventoryId, payloadItens)
+    .then((res) => {
+      console.log("Inventory finalized", res)
+      setShowFinalizeModal(false)
+      router.push("/estoque/inventario")
+    })
+    .catch((err) => {
+      console.error(err)
+      setShowFinalizeModal(false)
+      router.push("/estoque/inventario")
+    })
   }
 
   const pendingCount = items.filter((i) => i.status === "pending").length
@@ -251,16 +316,16 @@ export function InventoryCountingContent({ inventoryId }: { inventoryId: string 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <Label className="text-xs">Código</Label>
-              <div className="font-mono font-bold text-lg">{mockInventory.id}</div>
-              <div className="text-xs text-muted-foreground">{mockInventory.scope}</div>
+              <div className="font-mono font-bold text-lg">{inventory.id}</div>
+              <div className="text-xs text-muted-foreground">{inventory.scope}</div>
             </div>
             <div>
               <Label className="text-xs">Responsável</Label>
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-full bg-twilight text-imperial flex items-center justify-center text-xs font-semibold">
-                  {mockInventory.responsible.avatar}
+                  {inventory.responsible?.avatar}
                 </div>
-                <span className="text-sm">{mockInventory.responsible.name}</span>
+                <span className="text-sm">{inventory.responsible?.name}</span>
               </div>
             </div>
             <div>
@@ -275,7 +340,7 @@ export function InventoryCountingContent({ inventoryId }: { inventoryId: string 
               <div>
                 <div className="flex justify-between items-center mb-1">
                   <span className="text-sm font-semibold">
-                    {countedItems} de {mockInventory.totalItems}
+                    {countedItems} de {inventory.totalItems}
                   </span>
                   <span className="text-xs text-muted-foreground">{Math.round(progress)}%</span>
                 </div>
@@ -478,12 +543,12 @@ export function InventoryCountingContent({ inventoryId }: { inventoryId: string 
                     </div>
                     <div>
                       <div className="text-sm text-muted-foreground">Valor Unitário</div>
-                      <div className="text-xl font-semibold">R$ {selectedItem.unitValue.toFixed(2)}</div>
+                      <div className="text-xl font-semibold">{selectedItem.unitValue.toFixed(2)} MT</div>
                     </div>
                     <div>
                       <div className="text-sm text-muted-foreground">Valor Total</div>
                       <div className="text-xl font-semibold">
-                        R$ {(selectedItem.systemQty * selectedItem.unitValue).toLocaleString("pt-BR")}
+                        {(selectedItem.systemQty * selectedItem.unitValue).toLocaleString("pt-BR")} MT
                       </div>
                     </div>
                   </div>
@@ -676,7 +741,7 @@ export function InventoryCountingContent({ inventoryId }: { inventoryId: string 
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
                     <span className="text-muted-foreground">Total de Itens:</span>{" "}
-                    <span className="font-semibold">{mockInventory.totalItems}</span>
+                    <span className="font-semibold">{inventory.totalItems}</span>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Itens Contados:</span>{" "}

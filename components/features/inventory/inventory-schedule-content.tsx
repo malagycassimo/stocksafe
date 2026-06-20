@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import Link from "next/link"
 import {
   Calendar as CalendarIcon,
@@ -44,6 +44,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+
+import { inventarioService } from "@/app/services/inventarioService"
 
 // Mock data
 const mockInventories = [
@@ -146,6 +148,7 @@ const mockDivergences = [
 const statusConfig = {
   scheduled: { label: "Agendado", color: "bg-blue-100 text-blue-800", icon: "📅" },
   in_progress: { label: "Em Andamento", color: "bg-orange-100 text-orange-800", icon: "🔄" },
+  pending_approval: { label: "Aguardando Ajuste", color: "bg-yellow-100 text-yellow-800", icon: "⚖️" },
   completed: { label: "Concluído", color: "bg-twilight text-imperial", icon: "✅" },
   overdue: { label: "Atrasado", color: "bg-red-100 text-red-800", icon: "⏰" },
   cancelled: { label: "Cancelado", color: "bg-gray-100 text-gray-800", icon: "❌" },
@@ -174,18 +177,68 @@ export function InventoryScheduleContent() {
   const [typeFilter, setTypeFilter] = useState("all")
   const [dateRangeFilter, setDateRangeFilter] = useState("last30days")
   const [showFilters, setShowFilters] = useState(true)
-  const [selectedInventory, setSelectedInventory] = useState<typeof mockInventories[0] | null>(null)
+  const [selectedInventory, setSelectedInventory] = useState<any | null>(null)
   const [showDetails, setShowDetails] = useState(false)
+  const [inventories, setInventories] = useState<any[]>([])
+
+  useEffect(() => {
+    inventarioService.listar()
+      .then((data) => {
+        setInventories(data)
+      })
+      .catch((err) => {
+        console.error("Erro ao listar inventários:", err)
+        setInventories([])
+      })
+  }, [])
+
+  const mappedInventories = useMemo<any[]>(() => {
+    if (inventories.length === 0) return mockInventories
+    return inventories.map(inv => {
+      const type = (inv as any).type || 'general'
+      const statusMap: Record<string, string> = {
+        'AGENDADO': 'scheduled',
+        'EM_ANDAMENTO': 'in_progress',
+        'AGUARDANDO_APROVACAO': 'in_progress',
+        'CONCLUIDO': 'completed',
+        'CANCELADO': 'cancelled'
+      }
+      const typeLabelMap: Record<string, string> = {
+        'general': 'Geral',
+        'location': 'Por Local',
+        'category': 'Por Categoria',
+        'lot': 'Por Lote/Validade',
+        'focused': 'Focado'
+      }
+      return {
+        id: inv.id,
+        codigo: inv.codigo,
+        scheduledDate: inv.dateAgenda || inv.createdAt,
+        type,
+        typeLabel: typeLabelMap[type] || 'Geral',
+        scope: (inv as any).scope || 'Inventário Geral',
+        responsible: {
+          name: inv.responsavel || 'Supervisor Padrão',
+          avatar: (inv.responsavel || 'SP').split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()
+        },
+        status: statusMap[inv.status] || 'scheduled',
+        estimatedItems: (inv as any).estimatedItems || inv.itens?.length || 10,
+        countedItems: inv.itens?.filter((i: any) => i.quantidadeContada !== null).length || 0,
+        divergences: inv.itens?.filter((i: any) => i.divergencia !== 0 && i.divergencia !== null).length || 0
+      }
+    })
+  }, [inventories])
 
   // Filter inventories
   const filteredInventories = useMemo(() => {
-    let filtered = mockInventories
+    let filtered = mappedInventories
 
     // Search
     if (searchQuery) {
       filtered = filtered.filter(
         (inv) =>
           inv.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (inv.codigo && inv.codigo.toLowerCase().includes(searchQuery.toLowerCase())) ||
           inv.scope.toLowerCase().includes(searchQuery.toLowerCase()) ||
           inv.responsible.name.toLowerCase().includes(searchQuery.toLowerCase()),
       )
@@ -503,15 +556,27 @@ export function InventoryScheduleContent() {
                                     Ver Detalhes
                                   </DropdownMenuItem>
                                   {inv.status === "scheduled" && (
-                                    <DropdownMenuItem>
-                                      <Play className="w-4 h-4 mr-2" />
-                                      Iniciar
+                                    <DropdownMenuItem asChild>
+                                      <Link href={`/estoque/inventario/${inv.id}/contagem`} className="flex w-full items-center">
+                                        <Play className="w-4 h-4 mr-2" />
+                                        Iniciar Contagem
+                                      </Link>
                                     </DropdownMenuItem>
                                   )}
                                   {inv.status === "in_progress" && (
-                                    <DropdownMenuItem>
-                                      <Play className="w-4 h-4 mr-2" />
-                                      Continuar Contagem
+                                    <DropdownMenuItem asChild>
+                                      <Link href={`/estoque/inventario/${inv.id}/contagem`} className="flex w-full items-center">
+                                        <Play className="w-4 h-4 mr-2" />
+                                        Continuar Contagem
+                                      </Link>
+                                    </DropdownMenuItem>
+                                  )}
+                                  {inv.status === "pending_approval" && (
+                                    <DropdownMenuItem asChild>
+                                      <Link href={`/estoque/inventario/${inv.id}/ajustes`} className="flex w-full items-center text-imperial">
+                                        <Play className="w-4 h-4 mr-2" />
+                                        Revisar Ajustes
+                                      </Link>
                                     </DropdownMenuItem>
                                   )}
                                   <DropdownMenuSeparator />
@@ -634,7 +699,7 @@ export function InventoryScheduleContent() {
                         </td>
                         <td className="px-4 py-3">
                           <div className={`text-sm font-semibold ${div.totalValue > 0 ? "text-imperial" : "text-red-700"}`}>
-                            R$ {Math.abs(div.totalValue).toFixed(2)}
+                            {Math.abs(div.totalValue).toFixed(2)} MT
                           </div>
                         </td>
                         <td className="px-4 py-3">

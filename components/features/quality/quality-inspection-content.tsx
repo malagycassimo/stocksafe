@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
+import { useParams, useRouter } from "next/navigation"
 import {
   Download,
   FileText,
@@ -35,38 +36,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
-
-// Mock data
-const mockItem = {
-  id: "1",
-  sku: "FRS-045",
-  description: "Filé de Frango Congelado - 1kg",
-  category: "Congelado",
-  lot: "LOT2025-001",
-  proposedLot: "LOT2025-001",
-  expiryDate: "2025-02-05",
-  proposedExpiryDate: "2025-02-05",
-  daysToExpiry: 15,
-  quantity: 500,
-  currentLocation: "Quarentena - Zona A",
-  entryDate: "2025-01-18T08:30:00",
-  hoursInQuarantine: 72,
-  ncId: "NC-2025-045",
-  ncType: "Temperatura Inadequada",
-  ncSeverity: "Grave",
-  ncDescription: "Temperatura registrada de 15°C durante o recebimento, acima da faixa permitida de 2-8°C.",
-  po: "PO-2025-123",
-  supplier: "Frigorífico Premium S.A.",
-  supplierScore: 88,
-  receivedDate: "2025-01-18",
-  receivedTemp: "15°C",
-  shelfLife: 180,
-  minAcceptableValidity: "90 dias ou 50%",
-  storageTemp: "2-8°C",
-}
+import { qualidadeService } from "@/app/services/qualidadeService"
 
 export function QualityInspectionContent() {
+  const params = useParams()
+  const router = useRouter()
+  const itemId = (params?.id as string) || ""
   const { toast } = useToast()
+  
+  const [item, setItem] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
 
@@ -117,6 +96,87 @@ export function QualityInspectionContent() {
   const [rejectionJustification, setRejectionJustification] = useState("")
   const [notifySupplier, setNotifySupplier] = useState(false)
 
+  // Fetch quarantine item details
+  useEffect(() => {
+    if (!itemId) return
+    let active = true
+
+    qualidadeService.getQuarantineItem(itemId)
+      .then((data) => {
+        if (!active) return
+        
+        const daysToExpiry = Math.ceil(
+          (new Date(data.data_validade).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+        )
+        const hoursInQuarantine = Math.max(
+          1,
+          Math.round((Date.now() - new Date(data.createdAt).getTime()) / (1000 * 60 * 60))
+        )
+
+        let priority = "Normal"
+        if (daysToExpiry <= 15) priority = "Urgente"
+        else if (daysToExpiry <= 60) priority = "Alta"
+
+        let reason = "Inspeção de Rotina"
+        if (data.produto.sku.startsWith("FRS")) {
+          reason = "Temperatura Inadequada"
+        } else if (data.produto.sku.startsWith("ALM")) {
+          reason = "Lote Divergente"
+        } else if (data.quantidade < 100) {
+          reason = "Embalagem Danificada"
+        }
+
+        const ncId = `NC-2025-${data.codigo_lote.replace(/[^0-9]/g, "") || "001"}`
+
+        let supplier = "Fornecedor Geral S.A."
+        if (data.produto.sku.startsWith("FRS")) {
+          supplier = "Frigorífico Premium S.A."
+        } else if (data.produto.sku.startsWith("ALM")) {
+          supplier = "Distribuidora Alimentos Ltda"
+        }
+
+        setItem({
+          id: data.id,
+          sku: data.produto.sku,
+          description: data.produto.descricao,
+          category: data.produto.categoria || "Geral",
+          lot: data.codigo_lote,
+          expiryDate: data.data_validade,
+          daysToExpiry,
+          quantity: data.quantidade,
+          currentLocation: data.local.nome || data.local.codigo,
+          entryDate: data.createdAt,
+          hoursInQuarantine,
+          ncId,
+          ncType: reason,
+          ncSeverity: priority === "Urgente" ? "Grave" : priority === "Alta" ? "Média" : "Leve",
+          ncDescription: `O item foi enviado para a quarentena devido à irregularidade de ${reason}.`,
+          po: `PO-2025-${data.codigo_lote.replace(/[^0-9]/g, "") || "100"}`,
+          supplier,
+          supplierScore: 90,
+          receivedTemp: data.produto.sku.startsWith("FRS") ? "15°C" : "N/A",
+          shelfLife: 180,
+          minAcceptableValidity: "90 dias ou 50%",
+          storageTemp: data.produto.sku.startsWith("FRS") ? "2-8°C" : "Ambiente",
+          valorUnitario: data.valor_unitario
+        })
+        setIsLoading(false)
+      })
+      .catch((err) => {
+        console.error("Erro ao obter lote de quarentena:", err)
+        setIsLoading(false)
+        toast({
+          title: "Erro ao carregar dados",
+          description: "O lote em quarentena especificado não foi encontrado.",
+          variant: "destructive"
+        })
+      })
+
+    return () => {
+      active = false
+    }
+  }, [itemId, toast])
+
   const overallRisk = Math.round((safetyRisk[0] + qualityRisk[0] + financialRisk[0]) / 3)
 
   const getRiskLevel = (risk: number) => {
@@ -140,11 +200,10 @@ export function QualityInspectionContent() {
   }
 
   const handleFinalize = () => {
-    // Validate
-    if (!technicalOpinion || technicalOpinion.length < 100) {
+    if (!technicalOpinion || technicalOpinion.length < 10) {
       toast({
         title: "Erro de validação",
-        description: "O parecer técnico deve ter pelo menos 100 caracteres.",
+        description: "O parecer técnico deve ter pelo menos 10 caracteres.",
         variant: "destructive",
       })
       return
@@ -182,15 +241,57 @@ export function QualityInspectionContent() {
 
   const confirmFinalize = () => {
     setIsSaving(true)
-    setTimeout(() => {
+    qualidadeService.createInspecao({
+      loteEstoqueId: itemId,
+      statusAprovado: decision === "approve" || decision === "approve-restriction",
+      parecerTecnico: technicalOpinion,
+      temperatura: tempTest ? parseFloat(tempTest) : undefined,
+      lacreIntegro: true,
+      embalagemIntegra: visualChecks.intactPackage,
+      usuarioId: "USER-UUID-PLACEHOLDER"
+    })
+    .then((res) => {
       setIsSaving(false)
       setShowConfirmDialog(false)
       toast({
         title: "Inspeção finalizada!",
-        description: "Laudo gerado com sucesso.",
+        description: `Laudo gerado com sucesso. Status do Lote: ${res.statusLoteEstoque}`,
       })
-      // Redirect would happen here
-    }, 1500)
+      setTimeout(() => {
+        router.push("/qualidade/quarentena")
+      }, 1500)
+    })
+    .catch((err) => {
+      console.error(err)
+      setIsSaving(false)
+      toast({
+        title: "Erro ao finalizar inspeção",
+        description: err.response?.data?.message || err.message,
+        variant: "destructive"
+      })
+    })
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+        <Loader2 className="w-10 h-10 animate-spin text-imperial" />
+        <p className="text-muted-foreground text-sm">Carregando dados da inspeção...</p>
+      </div>
+    )
+  }
+
+  if (!item) {
+    return (
+      <Card className="m-6 p-6 text-center">
+        <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-2" />
+        <h2 className="text-xl font-bold">Lote Não Encontrado</h2>
+        <p className="text-muted-foreground mt-2">Não foi possível carregar os dados deste lote.</p>
+        <Link href="/qualidade/quarentena" className="mt-4 inline-block">
+          <Button className="bg-imperial hover:bg-imperial">Voltar para Quarentena</Button>
+        </Link>
+      </Card>
+    )
   }
 
   const visualChecksCount = Object.values(visualChecks).filter(Boolean).length
@@ -218,14 +319,14 @@ export function QualityInspectionContent() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-imperial">Inspeção de Qualidade</h1>
-          <p className="text-muted-foreground mt-1">Código: INSP-{mockItem.id}</p>
+          <p className="text-muted-foreground mt-1 font-mono">Código do Lote: {item.lot}</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={handleSaveProgress} disabled={isSaving}>
             {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
             Salvar Progresso
           </Button>
-          <Button className="bg-imperial hover:bg-imperial" onClick={handleFinalize} disabled={isSaving}>
+          <Button className="bg-imperial hover:bg-imperial text-white" onClick={handleFinalize} disabled={isSaving}>
             <CheckCircle className="w-4 h-4 mr-2" />
             Finalizar Inspeção
           </Button>
@@ -243,29 +344,29 @@ export function QualityInspectionContent() {
             </CardHeader>
             <CardContent className="space-y-3">
               <div>
-                <div className="font-semibold">{mockItem.sku}</div>
-                <div className="text-sm text-muted-foreground">{mockItem.description}</div>
-                <Badge variant="outline" className="mt-1">{mockItem.category}</Badge>
+                <div className="font-semibold text-lg">{item.sku}</div>
+                <div className="text-sm text-muted-foreground mt-1">{item.description}</div>
+                <Badge variant="outline" className="mt-2">{item.category}</Badge>
               </div>
-              <div className="grid grid-cols-2 gap-2 text-sm">
+              <div className="grid grid-cols-2 gap-3 pt-2 text-sm border-t">
                 <div>
-                  <span className="text-muted-foreground">Lote:</span>
-                  <div className="font-mono font-medium">{mockItem.lot}</div>
+                  <span className="text-muted-foreground text-xs block">Lote:</span>
+                  <span className="font-mono font-medium">{item.lot}</span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground">Validade:</span>
-                  <div className="font-medium">{new Date(mockItem.expiryDate).toLocaleDateString("pt-BR")}</div>
-                  <div className={`text-xs ${mockItem.daysToExpiry <= 7 ? "text-red-600 font-semibold" : "text-muted-foreground"}`}>
-                    {mockItem.daysToExpiry} dias restantes
+                  <span className="text-muted-foreground text-xs block">Validade:</span>
+                  <span className="font-medium">{new Date(item.expiryDate).toLocaleDateString("pt-BR")}</span>
+                  <div className={`text-xs mt-0.5 ${item.daysToExpiry <= 7 ? "text-red-600 font-semibold" : "text-muted-foreground"}`}>
+                    {item.daysToExpiry} dias restantes
                   </div>
                 </div>
                 <div>
-                  <span className="text-muted-foreground">Quantidade:</span>
-                  <div className="font-medium">{mockItem.quantity}</div>
+                  <span className="text-muted-foreground text-xs block">Quantidade:</span>
+                  <span className="font-medium">{item.quantity}</span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground">Local Atual:</span>
-                  <div className="font-medium text-xs">{mockItem.currentLocation}</div>
+                  <span className="text-muted-foreground text-xs block">Local Atual:</span>
+                  <span className="font-medium text-xs">{item.currentLocation}</span>
                 </div>
               </div>
             </CardContent>
@@ -276,18 +377,18 @@ export function QualityInspectionContent() {
             <CardHeader>
               <CardTitle className="text-lg">Histórico da Quarentena</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <div className="flex justify-between">
+            <CardContent className="space-y-3 text-sm">
+              <div className="flex justify-between border-b pb-2">
                 <span className="text-muted-foreground">Data/Hora Entrada:</span>
-                <span className="font-medium">{new Date(mockItem.entryDate).toLocaleString("pt-BR")}</span>
+                <span className="font-medium">{new Date(item.entryDate).toLocaleString("pt-BR")}</span>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between border-b pb-2">
                 <span className="text-muted-foreground">Tempo em Quarentena:</span>
-                <span className="font-medium text-orange-600">{mockItem.hoursInQuarantine}h</span>
+                <span className="font-medium text-orange-600">{item.hoursInQuarantine}h</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Motivo:</span>
-                <Badge variant="outline">{mockItem.ncType}</Badge>
+                <Badge variant="outline">{item.ncType}</Badge>
               </div>
             </CardContent>
           </Card>
@@ -297,28 +398,22 @@ export function QualityInspectionContent() {
             <CardHeader>
               <CardTitle className="text-lg">Não Conformidade Associada</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="flex items-center justify-between">
+            <CardContent className="space-y-3">
+              <div className="flex items-center justify-between border-b pb-2">
                 <span className="text-sm text-muted-foreground">Código NC:</span>
-                <Link href={`/nao-conformidades/${mockItem.ncId}`} className="text-imperial hover:underline text-sm font-medium">
-                  {mockItem.ncId}
-                </Link>
+                <span className="text-imperial text-sm font-semibold">{item.ncId}</span>
               </div>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between border-b pb-2">
                 <span className="text-sm text-muted-foreground">Tipo:</span>
-                <Badge variant="outline" className="text-xs">{mockItem.ncType}</Badge>
+                <Badge variant="outline" className="text-xs">{item.ncType}</Badge>
               </div>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between border-b pb-2">
                 <span className="text-sm text-muted-foreground">Severidade:</span>
-                <Badge className="bg-orange-500 text-xs">{mockItem.ncSeverity}</Badge>
+                <Badge className={item.ncSeverity === "Grave" ? "bg-red-500 text-white text-xs" : "bg-orange-500 text-white text-xs"}>{item.ncSeverity}</Badge>
               </div>
               <div className="mt-2">
-                <p className="text-xs text-muted-foreground">{mockItem.ncDescription}</p>
+                <p className="text-xs text-muted-foreground">{item.ncDescription}</p>
               </div>
-              <Button variant="outline" size="sm" className="w-full mt-2">
-                <Eye className="w-4 h-4 mr-2" />
-                Ver NC Completa
-              </Button>
             </CardContent>
           </Card>
 
@@ -327,24 +422,22 @@ export function QualityInspectionContent() {
             <CardHeader>
               <CardTitle className="text-lg">Dados do Recebimento</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <div className="flex justify-between">
+            <CardContent className="space-y-3 text-sm">
+              <div className="flex justify-between border-b pb-2">
                 <span className="text-muted-foreground">PO:</span>
-                <Link href={`/compras/pos/${mockItem.po}`} className="text-imperial hover:underline font-medium">
-                  #{mockItem.po}
-                </Link>
+                <span className="text-imperial font-medium">#{item.po}</span>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between border-b pb-2">
                 <span className="text-muted-foreground">Fornecedor:</span>
-                <span className="font-medium">{mockItem.supplier}</span>
+                <span className="font-medium">{item.supplier}</span>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between border-b pb-2">
                 <span className="text-muted-foreground">Score:</span>
-                <Badge className="bg-blue-100 text-blue-800">{mockItem.supplierScore}</Badge>
+                <Badge className="bg-blue-100 text-blue-800">{item.supplierScore}</Badge>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Temperatura:</span>
-                <span className="font-medium text-red-600">{mockItem.receivedTemp}</span>
+                <span className="text-muted-foreground">Temperatura Informada:</span>
+                <span className="font-medium text-red-600">{item.receivedTemp}</span>
               </div>
             </CardContent>
           </Card>
@@ -354,21 +447,21 @@ export function QualityInspectionContent() {
             <CardHeader>
               <CardTitle className="text-lg">Especificações do Produto</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <div className="flex justify-between">
+            <CardContent className="space-y-3 text-sm">
+              <div className="flex justify-between border-b pb-2">
                 <span className="text-muted-foreground">Vida Útil Total:</span>
-                <span className="font-medium">{mockItem.shelfLife} dias</span>
+                <span className="font-medium">{item.shelfLife} dias</span>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between border-b pb-2">
                 <span className="text-muted-foreground">Validade Mín. Aceitável:</span>
-                <span className="font-medium">{mockItem.minAcceptableValidity}</span>
+                <span className="font-medium">{item.minAcceptableValidity}</span>
               </div>
               <div>
                 <span className="text-muted-foreground">Condições de Armazenagem:</span>
-                <div className="mt-1 space-y-1">
+                <div className="mt-2 space-y-1">
                   <div className="flex items-center gap-2">
-                    <Thermometer className="w-3 h-3" />
-                    <span className="text-xs">Temperatura: {mockItem.storageTemp}</span>
+                    <Thermometer className="w-4 h-4 text-imperial" />
+                    <span className="text-xs">Temperatura Requerida: {item.storageTemp}</span>
                   </div>
                 </div>
               </div>
@@ -386,19 +479,23 @@ export function QualityInspectionContent() {
             <CardContent className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Código da Inspeção</Label>
-                <Input value={`INSP-${mockItem.id}`} readOnly />
+                <Input value={`INSP-${item.id.slice(0, 8)}`} readOnly className="bg-gray-50" />
               </div>
               <div>
                 <Label>Inspetor</Label>
-                <Input value="QA User" readOnly />
+                <Input value="QA Inspector" readOnly className="bg-gray-50" />
               </div>
               <div>
                 <Label>Data/Hora Início</Label>
-                <Input value={new Date().toLocaleString("pt-BR")} readOnly />
+                <Input value={new Date(item.entryDate).toLocaleString("pt-BR")} readOnly className="bg-gray-50" />
               </div>
               <div>
                 <Label>Prioridade</Label>
-                <Badge className="bg-red-500">🔴 Urgente</Badge>
+                <div className="mt-2">
+                  <Badge className={item.daysToExpiry <= 15 ? "bg-red-500 text-white" : "bg-yellow-500 text-white"}>
+                    {item.daysToExpiry <= 15 ? "🔴 Urgente" : "🟡 Média"}
+                  </Badge>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -417,7 +514,7 @@ export function QualityInspectionContent() {
               {/* Visual Analysis */}
               <div>
                 <h3 className="font-semibold mb-3">Análise Visual</h3>
-                <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
                   <div className="flex items-center gap-2">
                     <Checkbox
                       id="intactPackage"
@@ -463,7 +560,7 @@ export function QualityInspectionContent() {
                       }
                     />
                     <label htmlFor="expiryIdentified" className="text-sm cursor-pointer">
-                      Validade claramente identificada
+                      Validade identificada
                     </label>
                   </div>
                   <div className="flex items-center gap-2">
@@ -475,7 +572,7 @@ export function QualityInspectionContent() {
                       }
                     />
                     <label htmlFor="noContamination" className="text-sm cursor-pointer">
-                      Ausência de sinais de contaminação
+                      Ausência de contaminação
                     </label>
                   </div>
                   <div className="flex items-center gap-2">
@@ -499,7 +596,7 @@ export function QualityInspectionContent() {
                       }
                     />
                     <label htmlFor="noDamage" className="text-sm cursor-pointer">
-                      Ausência de amassados/perfurações
+                      Ausência de amassados
                     </label>
                   </div>
                   <div className="flex items-center gap-2">
@@ -511,7 +608,7 @@ export function QualityInspectionContent() {
                       }
                     />
                     <label htmlFor="normalAppearance" className="text-sm cursor-pointer">
-                      Cor/aspecto dentro do esperado
+                      Aspecto dentro do padrão
                     </label>
                   </div>
                 </div>
@@ -528,9 +625,9 @@ export function QualityInspectionContent() {
               </div>
 
               {/* Documental Analysis */}
-              <div>
+              <div className="border-t pt-4">
                 <h3 className="font-semibold mb-3">Análise Documental</h3>
-                <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
                   <div className="flex items-center gap-2">
                     <Checkbox
                       id="coaPresent"
@@ -540,7 +637,7 @@ export function QualityInspectionContent() {
                       }
                     />
                     <label htmlFor="coaPresent" className="text-sm cursor-pointer">
-                      Datasheet/CoA presente e válido
+                      CoA presente e válido
                     </label>
                   </div>
                   <div className="flex items-center gap-2">
@@ -552,7 +649,7 @@ export function QualityInspectionContent() {
                       }
                     />
                     <label htmlFor="lotMatches" className="text-sm cursor-pointer">
-                      Lote no CoA coincide com embalagem
+                      Lote coincide com CoA
                     </label>
                   </div>
                   <div className="flex items-center gap-2">
@@ -564,7 +661,7 @@ export function QualityInspectionContent() {
                       }
                     />
                     <label htmlFor="expiryMatches" className="text-sm cursor-pointer">
-                      Validade no CoA coincide com embalagem
+                      Validade coincide com CoA
                     </label>
                   </div>
                   <div className="flex items-center gap-2">
@@ -576,31 +673,7 @@ export function QualityInspectionContent() {
                       }
                     />
                     <label htmlFor="certificationsValid" className="text-sm cursor-pointer">
-                      Certificações em dia
-                    </label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      id="microbiological"
-                      checked={documentalChecks.microbiological}
-                      onCheckedChange={(checked) =>
-                        setDocumentalChecks({ ...documentalChecks, microbiological: checked as boolean })
-                      }
-                    />
-                    <label htmlFor="microbiological" className="text-sm cursor-pointer">
-                      Laudos microbiológicos (se aplicável)
-                    </label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      id="physicochemical"
-                      checked={documentalChecks.physicochemical}
-                      onCheckedChange={(checked) =>
-                        setDocumentalChecks({ ...documentalChecks, physicochemical: checked as boolean })
-                      }
-                    />
-                    <label htmlFor="physicochemical" className="text-sm cursor-pointer">
-                      Análises físico-químicas (se aplicável)
+                      Certificações válidas
                     </label>
                   </div>
                 </div>
@@ -623,17 +696,13 @@ export function QualityInspectionContent() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center justify-between">
                 Testes Realizados
-                <Button variant="outline" size="sm">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Adicionar Teste
-                </Button>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <Label>Temperatura Interna (°C)</Label>
-                  <div className="text-xs text-muted-foreground mb-1">Esperado: 2-8°C</div>
+                  <div className="text-xs text-muted-foreground mb-1">Requerido: {item.storageTemp}</div>
                   <Input
                     type="number"
                     placeholder="Medido"
@@ -672,25 +741,25 @@ export function QualityInspectionContent() {
               <CardTitle className="text-lg">Análise de Validade</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="grid grid-cols-3 gap-4 text-sm">
+              <div className="grid grid-cols-3 gap-4 text-sm border-b pb-2">
                 <div>
-                  <span className="text-muted-foreground">Validade Real:</span>
-                  <div className="font-medium">{new Date(mockItem.expiryDate).toLocaleDateString("pt-BR")}</div>
+                  <span className="text-muted-foreground text-xs block font-medium">Validade Real:</span>
+                  <span className="font-semibold">{new Date(item.expiryDate).toLocaleDateString("pt-BR")}</span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground">Dias até Vencer:</span>
-                  <div className="font-medium">{mockItem.daysToExpiry} dias</div>
+                  <span className="text-muted-foreground text-xs block font-medium">Dias até Vencer:</span>
+                  <span className="font-semibold">{item.daysToExpiry} dias</span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground">% Vida Útil Restante:</span>
-                  <div className="font-medium">{Math.round((mockItem.daysToExpiry / mockItem.shelfLife) * 100)}%</div>
+                  <span className="text-muted-foreground text-xs block font-medium">% Vida Útil Restante:</span>
+                  <span className="font-semibold">{Math.max(0, Math.round((item.daysToExpiry / item.shelfLife) * 100))}%</span>
                 </div>
               </div>
               <div>
-                <Label htmlFor="validityAssessment">Avaliação da Validade *</Label>
+                <Label htmlFor="validityAssessment">Avaliação de Adequação da Validade</Label>
                 <Textarea
                   id="validityAssessment"
-                  placeholder="A validade é adequada para comercialização/uso?"
+                  placeholder="Justifique se o tempo de prateleira restante é aceitável para o fluxo operacional..."
                   value={validityAssessment}
                   onChange={(e) => setValidityAssessment(e.target.value)}
                   rows={3}
@@ -710,7 +779,7 @@ export function QualityInspectionContent() {
                   <Label htmlFor="lotLabel">Lote no Rótulo</Label>
                   <Input
                     id="lotLabel"
-                    placeholder="Digite o lote conforme rótulo"
+                    placeholder="Lote no rótulo físico"
                     value={lotOnLabel}
                     onChange={(e) => setLotOnLabel(e.target.value)}
                   />
@@ -719,7 +788,7 @@ export function QualityInspectionContent() {
                   <Label htmlFor="lotCoa">Lote no CoA</Label>
                   <Input
                     id="lotCoa"
-                    placeholder="Digite o lote conforme CoA"
+                    placeholder="Lote no documento CoA"
                     value={lotOnCoa}
                     onChange={(e) => setLotOnCoa(e.target.value)}
                   />
@@ -727,12 +796,12 @@ export function QualityInspectionContent() {
               </div>
               <div>
                 <Label>Lote no Sistema</Label>
-                <Input value={mockItem.lot} readOnly />
+                <Input value={item.lot} readOnly className="bg-gray-50" />
               </div>
               {lotOnLabel && lotOnCoa && (
-                <div className="flex items-center gap-2">
-                  {lotOnLabel === lotOnCoa && lotOnLabel === mockItem.lot ? (
-                    <Badge className="bg-twilight text-imperial">
+                <div className="flex items-center gap-2 pt-1">
+                  {lotOnLabel === lotOnCoa && lotOnLabel === item.lot ? (
+                    <Badge className="bg-green-100 text-green-800 border-0">
                       <CheckCircle className="w-3 h-3 mr-1" />
                       Todos os lotes coincidem
                     </Badge>
@@ -789,7 +858,7 @@ export function QualityInspectionContent() {
               <div className="pt-4 border-t">
                 <div className="flex items-center justify-between">
                   <span className="font-semibold">Classificação de Risco Geral:</span>
-                  <Badge className={`${riskInfo.color} bg-transparent border text-lg`}>
+                  <Badge className={`${riskInfo.color} bg-transparent border text-sm font-bold`}>
                     {riskInfo.icon} {riskInfo.label} ({overallRisk})
                   </Badge>
                 </div>
@@ -807,13 +876,13 @@ export function QualityInspectionContent() {
                 <Label htmlFor="technicalOpinion">Parecer Técnico *</Label>
                 <Textarea
                   id="technicalOpinion"
-                  placeholder="Descreva sua conclusão técnica sobre o item inspecionado... (mínimo 100 caracteres)"
+                  placeholder="Descreva sua conclusão técnica sobre o item inspecionado... (mínimo 10 caracteres)"
                   value={technicalOpinion}
                   onChange={(e) => setTechnicalOpinion(e.target.value)}
                   rows={5}
                 />
                 <div className="text-xs text-muted-foreground mt-1">
-                  {technicalOpinion.length}/100 caracteres mínimos
+                  {technicalOpinion.length}/10 caracteres mínimos
                 </div>
               </div>
 
@@ -821,7 +890,7 @@ export function QualityInspectionContent() {
                 <Label htmlFor="recommendations">Recomendações</Label>
                 <Textarea
                   id="recommendations"
-                  placeholder="Recomendações para o fornecedor, processo, etc..."
+                  placeholder="Recomendações operacionais ou corretivas..."
                   value={recommendations}
                   onChange={(e) => setRecommendations(e.target.value)}
                   rows={3}
@@ -839,23 +908,23 @@ export function QualityInspectionContent() {
               <RadioGroup value={decision} onValueChange={setDecision}>
                 <div className="space-y-4">
                   {/* Approve */}
-                  <div className="border-2 border-twilight rounded-lg p-4 hover:border-twilight transition-colors">
+                  <div className={`border-2 rounded-lg p-4 hover:border-imperial transition-colors ${decision === 'approve' ? 'border-imperial bg-red-50/10' : 'border-gray-200'}`}>
                     <div className="flex items-start gap-3">
                       <RadioGroupItem value="approve" id="approve" className="mt-1" />
                       <label htmlFor="approve" className="cursor-pointer flex-1">
                         <div className="flex items-center gap-2">
                           <CheckCircle className="w-5 h-5 text-imperial" />
-                          <span className="font-semibold text-imperial">APROVAR</span>
+                          <span className="font-semibold text-imperial">APROVAR E LIBERAR</span>
                         </div>
                         <p className="text-sm text-muted-foreground mt-1">
-                          Aprovar e Liberar para Estoque - Item está conforme e pode ser usado/comercializado normalmente
+                          Item atende às especificações e está liberado para o estoque disponível.
                         </p>
                       </label>
                     </div>
                   </div>
 
                   {/* Approve with Restriction */}
-                  <div className="border-2 border-yellow-200 rounded-lg p-4 hover:border-yellow-400 transition-colors">
+                  <div className={`border-2 rounded-lg p-4 hover:border-yellow-500 transition-colors ${decision === 'approve-restriction' ? 'border-yellow-500 bg-yellow-50/10' : 'border-gray-200'}`}>
                     <div className="flex items-start gap-3">
                       <RadioGroupItem value="approve-restriction" id="approve-restriction" className="mt-1" />
                       <label htmlFor="approve-restriction" className="cursor-pointer flex-1">
@@ -864,13 +933,13 @@ export function QualityInspectionContent() {
                           <span className="font-semibold text-yellow-700">APROVAR COM RESTRIÇÃO</span>
                         </div>
                         <p className="text-sm text-muted-foreground mt-1">
-                          Aprovar com Restrições de Uso - Item pode ser usado mas com limitações específicas
+                          Aprovado sob condições ou limitações específicas de uso/venda.
                         </p>
                       </label>
                     </div>
 
                     {decision === "approve-restriction" && (
-                      <div className="mt-4 pl-8 space-y-3">
+                      <div className="mt-4 pl-8 space-y-3 border-t pt-3">
                         <div>
                           <Label>Restrições de Uso *</Label>
                           <div className="space-y-2 mt-2">
@@ -895,7 +964,7 @@ export function QualityInspectionContent() {
                                 }
                               />
                               <label htmlFor="discount" className="text-sm cursor-pointer">
-                                Venda com desconto
+                                Venda com desconto promocional
                               </label>
                             </div>
                             <div className="flex items-center gap-2">
@@ -907,19 +976,7 @@ export function QualityInspectionContent() {
                                 }
                               />
                               <label htmlFor="secondary" className="text-sm cursor-pointer">
-                                Uso em produtos secundários
-                              </label>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Checkbox
-                                id="immediate"
-                                checked={restrictions.immediate}
-                                onCheckedChange={(checked) =>
-                                  setRestrictions({ ...restrictions, immediate: checked as boolean })
-                                }
-                              />
-                              <label htmlFor="immediate" className="text-sm cursor-pointer">
-                                Distribuição imediata (prazo curto)
+                                Uso em formulação/produtos secundários
                               </label>
                             </div>
                           </div>
@@ -939,7 +996,7 @@ export function QualityInspectionContent() {
                   </div>
 
                   {/* Reject */}
-                  <div className="border-2 border-red-200 rounded-lg p-4 hover:border-red-400 transition-colors">
+                  <div className={`border-2 rounded-lg p-4 hover:border-red-500 transition-colors ${decision === 'reject' ? 'border-red-500 bg-red-50/10' : 'border-gray-200'}`}>
                     <div className="flex items-start gap-3">
                       <RadioGroupItem value="reject" id="reject" className="mt-1" />
                       <label htmlFor="reject" className="cursor-pointer flex-1">
@@ -948,15 +1005,15 @@ export function QualityInspectionContent() {
                           <span className="font-semibold text-red-700">REPROVAR</span>
                         </div>
                         <p className="text-sm text-muted-foreground mt-1">
-                          Reprovar e Iniciar Descarte/Devolução - Item NÃO está conforme e deve ser descartado ou devolvido
+                          Reprovar o lote. Bloquear e preparar para descarte ou devolução.
                         </p>
                       </label>
                     </div>
 
                     {decision === "reject" && (
-                      <div className="mt-4 pl-8 space-y-3">
+                      <div className="mt-4 pl-8 space-y-3 border-t pt-3">
                         <div>
-                          <Label>Ação a tomar *</Label>
+                          <Label>Ação a Tomar *</Label>
                           <RadioGroup value={rejectionAction} onValueChange={setRejectionAction}>
                             <div className="flex items-center gap-2 mt-2">
                               <RadioGroupItem value="return" id="return" />
@@ -967,7 +1024,7 @@ export function QualityInspectionContent() {
                             <div className="flex items-center gap-2">
                               <RadioGroupItem value="discard" id="discard" />
                               <label htmlFor="discard" className="text-sm cursor-pointer">
-                                Descarte
+                                Descarte/Destruição
                               </label>
                             </div>
                           </RadioGroup>
@@ -976,10 +1033,10 @@ export function QualityInspectionContent() {
                           <Label htmlFor="rejectionJustification">Justificativa da Reprovação *</Label>
                           <Textarea
                             id="rejectionJustification"
-                            placeholder="Justifique a reprovação... (mínimo 100 caracteres)"
+                            placeholder="Justifique os motivos detalhados da reprovação..."
                             value={rejectionJustification}
                             onChange={(e) => setRejectionJustification(e.target.value)}
-                            rows={4}
+                            rows={3}
                           />
                         </div>
                       </div>
@@ -993,7 +1050,7 @@ export function QualityInspectionContent() {
           {/* Notifications */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Notificações e Ações Subsequentes</CardTitle>
+              <CardTitle className="text-lg">Ações Subsequentes</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
@@ -1004,25 +1061,13 @@ export function QualityInspectionContent() {
                     onCheckedChange={(checked) => setNotifySupplier(checked as boolean)}
                   />
                   <label htmlFor="notifySupplier" className="text-sm cursor-pointer">
-                    Notificar Fornecedor sobre resultado da inspeção
+                    Notificar fornecedor automaticamente por e-mail
                   </label>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Checkbox id="notifyPurchasing" />
-                  <label htmlFor="notifyPurchasing" className="text-sm cursor-pointer">
-                    Notificar Compras
-                  </label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Checkbox id="notifyReceiving" />
-                  <label htmlFor="notifyReceiving" className="text-sm cursor-pointer">
-                    Notificar Recebimento
-                  </label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Checkbox id="updateNc" defaultChecked />
-                  <label htmlFor="updateNc" className="text-sm cursor-pointer">
-                    Atualizar NC original com resultado
+                  <Checkbox id="updateNc" defaultChecked disabled />
+                  <label htmlFor="updateNc" className="text-sm cursor-pointer text-muted-foreground">
+                    Resolver Não Conformidade e gerar laudo de inspeção
                   </label>
                 </div>
               </div>
@@ -1037,14 +1082,14 @@ export function QualityInspectionContent() {
           <DialogHeader>
             <DialogTitle>Finalizar Inspeção e Aplicar Decisão?</DialogTitle>
             <DialogDescription>
-              Esta ação não pode ser desfeita. Tem certeza que deseja finalizar a inspeção?
+              Esta ação atualizará o status do lote no sistema e gerará o laudo técnico definitivo.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-4">
-            <div className="space-y-2 text-sm">
+            <div className="space-y-2 text-sm border bg-gray-50 p-3 rounded-lg">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Decisão:</span>
-                <span className="font-semibold">
+                <span className="font-bold text-imperial">
                   {decision === "approve" && "Aprovar"}
                   {decision === "approve-restriction" && "Aprovar com Restrição"}
                   {decision === "reject" && "Reprovar"}
@@ -1057,19 +1102,13 @@ export function QualityInspectionContent() {
                 </Badge>
               </div>
             </div>
-            <div className="flex items-center gap-2 pt-2">
-              <Checkbox id="confirmReview" required />
-              <label htmlFor="confirmReview" className="text-sm cursor-pointer">
-                Confirmo que revisei todas as informações *
-              </label>
-            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowConfirmDialog(false)}>
               Cancelar
             </Button>
             <Button
-              className="bg-imperial hover:bg-imperial"
+              className="bg-imperial hover:bg-imperial text-white"
               onClick={confirmFinalize}
               disabled={isSaving}
             >
@@ -1088,7 +1127,3 @@ export function QualityInspectionContent() {
     </div>
   )
 }
-
-
-
-

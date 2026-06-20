@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Search, Camera, Upload, AlertTriangle, CheckCircle2, X, Thermometer } from "lucide-react"
@@ -23,6 +23,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { toast } from "sonner"
+import { recebimentoService } from "@/app/services/recebimentoService"
 
 export function CheckinContent() {
   const router = useRouter()
@@ -40,6 +41,7 @@ export function CheckinContent() {
   const [descricaoAvarias, setDescricaoAvarias] = useState("")
   const [observacoes, setObservacoes] = useState("")
   const [showConfirmModal, setShowConfirmModal] = useState(false)
+  const [purchaseOrders, setPurchaseOrders] = useState<any[]>([])
 
   const mockPOs = [
     {
@@ -60,6 +62,30 @@ export function CheckinContent() {
     },
   ]
 
+  useEffect(() => {
+    recebimentoService.listPurchaseOrders()
+      .then((data) => {
+        if (data && data.length > 0) {
+          const mapped = data.map(po => ({
+            id: po.codigo,
+            supplier: po.fornecedor.razao_social,
+            expectedDate: po.expectedDelivery.split('T')[0],
+            itemsCount: 1,
+            status: po.status.charAt(0).toUpperCase() + po.status.slice(1).toLowerCase(),
+            isOverdue: new Date(po.expectedDelivery) < new Date(),
+            rawPo: po
+          }))
+          setPurchaseOrders(mapped)
+        } else {
+          setPurchaseOrders(mockPOs)
+        }
+      })
+      .catch((err) => {
+        console.error(err)
+        setPurchaseOrders(mockPOs)
+      })
+  }, [])
+
   const handleSelectPo = (po: any) => {
     setSelectedPo(po)
   }
@@ -68,7 +94,7 @@ export function CheckinContent() {
     toast.info("Ativando câmera para scan...")
     // Simulate finding PO
     setTimeout(() => {
-      handleSelectPo(mockPOs[0])
+      handleSelectPo(purchaseOrders[0] || mockPOs[0])
       toast.success("PO encontrado via etiqueta")
     }, 1000)
   }
@@ -106,17 +132,29 @@ export function CheckinContent() {
   }
 
   const completeCheckin = () => {
-    toast.success("Check-in registrado com sucesso!")
-    setShowConfirmModal(false)
+    recebimentoService.createCheckIn({
+      placaVeiculo: placa,
+      motoristaNome: motorista,
+      transportador: transportadora,
+      poCodigo: selectedPo.id
+    })
+    .then((res) => {
+      toast.success(`Check-in registrado com sucesso! Código: ${res.codigoCheckIn}`)
+      setShowConfirmModal(false)
 
-    // Ask if want to start inspection
-    setTimeout(() => {
-      if (confirm("Iniciar conferência agora?")) {
-        router.push(`/recebimento/conferencia?po=${selectedPo.id}`)
-      } else {
-        router.push("/recebimento/aguardando")
-      }
-    }, 500)
+      setTimeout(() => {
+        if (confirm("Iniciar conferência agora?")) {
+          const poUuid = selectedPo.rawPo?.id || selectedPo.id
+          router.push(`/recebimento/conferencia?po=${poUuid}`)
+        } else {
+          router.push("/recebimento/aguardando")
+        }
+      }, 500)
+    })
+    .catch((err) => {
+      console.error(err)
+      toast.error("Erro ao registrar check-in no servidor.")
+    })
   }
 
   return (
@@ -170,7 +208,7 @@ export function CheckinContent() {
                 </div>
 
                 <div className="space-y-2">
-                  {mockPOs
+                  {purchaseOrders
                     .filter((po) => po.id.toLowerCase().includes(searchQuery.toLowerCase()))
                     .map((po) => (
                       <div

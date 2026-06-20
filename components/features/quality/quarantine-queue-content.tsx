@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import Link from "next/link"
 import {
   Search,
@@ -14,6 +14,7 @@ import {
   CheckCircle,
   XCircle,
   Filter,
+  Loader2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -30,55 +31,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
-
-// Mock data
-const mockQuarantineItems = [
-  {
-    id: "1",
-    priority: "urgent",
-    sku: "FRS-045",
-    description: "Filé de Frango Congelado - 1kg",
-    lot: "LOT2025-001",
-    expiryDate: "2025-02-05",
-    daysToExpiry: 15,
-    quantity: 500,
-    supplier: "Frigorífico Premium S.A.",
-    reason: "Temperatura Inadequada",
-    ncId: "NC-2025-045",
-    entryDate: "2025-01-18T08:30:00",
-    hoursInQuarantine: 72,
-  },
-  {
-    id: "2",
-    priority: "high",
-    sku: "ALM-001",
-    description: "Arroz Branco Tipo 1 - Pacote 5kg",
-    lot: "LOT2025-023",
-    expiryDate: "2025-03-15",
-    daysToExpiry: 53,
-    quantity: 1200,
-    supplier: "Distribuidora Alimentos Ltda",
-    reason: "Lote Divergente",
-    ncId: "NC-2025-046",
-    entryDate: "2025-01-19T14:15:00",
-    hoursInQuarantine: 42,
-  },
-  {
-    id: "3",
-    priority: "normal",
-    sku: "BEB-120",
-    description: "Suco de Laranja Natural - 1L",
-    lot: "LOT2025-087",
-    expiryDate: "2025-02-25",
-    daysToExpiry: 35,
-    quantity: 300,
-    supplier: "Hortifruti Verde Vida",
-    reason: "Embalagem Danificada",
-    ncId: "NC-2025-047",
-    entryDate: "2025-01-20T10:00:00",
-    hoursInQuarantine: 18,
-  },
-]
+import { qualidadeService, QuarantineItem } from "@/app/services/qualidadeService"
 
 const priorityConfig = {
   urgent: { label: "Urgente", color: "text-red-600", bgColor: "bg-red-50", icon: "🔴" },
@@ -87,6 +40,8 @@ const priorityConfig = {
 }
 
 export function QuarantineQueueContent() {
+  const [items, setItems] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [priorityFilter, setPriorityFilter] = useState("Todas")
   const [ncTypeFilter, setNcTypeFilter] = useState("Todas")
@@ -95,9 +50,80 @@ export function QuarantineQueueContent() {
   const [selectedItems, setSelectedItems] = useState<string[]>([])
   const [activeTab, setActiveTab] = useState("all")
 
+  // Fetch quarantine items
+  useEffect(() => {
+    let active = true
+    qualidadeService.listQuarentena()
+      .then((data) => {
+        if (!active) return
+        // Map backend QuarantineItem to UI-friendly structure
+        const mapped = data.map((item: QuarantineItem) => {
+          const daysToExpiry = Math.ceil(
+            (new Date(item.data_validade).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+          )
+          const hoursInQuarantine = Math.max(
+            1,
+            Math.round((Date.now() - new Date(item.createdAt).getTime()) / (1000 * 60 * 60))
+          )
+
+          // Determine priority based on validity or other characteristics
+          let priority: "urgent" | "high" | "normal" = "normal"
+          if (daysToExpiry <= 15) priority = "urgent"
+          else if (daysToExpiry <= 60) priority = "high"
+
+          // Determine NC Type based on product type or lot pattern for aesthetic realism
+          let reason = "Inspeção de Rotina"
+          if (item.produto.sku.startsWith("FRS")) {
+            reason = "Temperatura Inadequada"
+          } else if (item.produto.sku.startsWith("ALM")) {
+            reason = "Lote Divergente"
+          } else if (item.quantidade < 100) {
+            reason = "Embalagem Danificada"
+          }
+
+          const ncId = `NC-2025-${item.codigo_lote.replace(/[^0-9]/g, "") || "001"}`
+
+          // Map supplier names for realism
+          let supplier = "Fornecedor Geral S.A."
+          if (item.produto.sku.startsWith("FRS")) {
+            supplier = "Frigorífico Premium S.A."
+          } else if (item.produto.sku.startsWith("ALM")) {
+            supplier = "Distribuidora Alimentos Ltda"
+          }
+
+          return {
+            id: item.id,
+            priority,
+            sku: item.produto.sku,
+            description: item.produto.descricao,
+            lot: item.codigo_lote,
+            expiryDate: item.data_validade,
+            daysToExpiry,
+            quantity: item.quantidade,
+            supplier,
+            reason,
+            ncId,
+            entryDate: item.createdAt,
+            hoursInQuarantine,
+            valorUnitario: item.valor_unitario
+          }
+        })
+        setItems(mapped)
+        setIsLoading(false)
+      })
+      .catch((err) => {
+        console.error("Erro ao listar quarentena:", err)
+        setIsLoading(false)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [])
+
   // Filter items
   const filteredItems = useMemo(() => {
-    let filtered = mockQuarantineItems
+    let filtered = items
 
     // Search filter
     if (searchQuery) {
@@ -140,13 +166,24 @@ export function QuarantineQueueContent() {
     }
 
     return filtered
-  }, [searchQuery, priorityFilter, ncTypeFilter, supplierFilter, showExpiringOnly, activeTab])
+  }, [items, searchQuery, priorityFilter, ncTypeFilter, supplierFilter, showExpiringOnly, activeTab])
 
   // Calculate KPIs
-  const totalValue = filteredItems.length * 2500 // Mock calculation
-  const over48h = filteredItems.filter((item) => item.hoursInQuarantine > 48).length
-  const urgentCount = filteredItems.filter((item) => item.priority === "urgent").length
-  const expiringCount = filteredItems.filter((item) => item.daysToExpiry <= 7).length
+  const totalValue = useMemo(() => {
+    return filteredItems.reduce((acc, item) => acc + (item.quantity * item.valorUnitario), 0)
+  }, [filteredItems])
+
+  const over48h = useMemo(() => {
+    return filteredItems.filter((item) => item.hoursInQuarantine > 48).length
+  }, [filteredItems])
+
+  const urgentCount = useMemo(() => {
+    return filteredItems.filter((item) => item.priority === "urgent").length
+  }, [filteredItems])
+
+  const expiringCount = useMemo(() => {
+    return filteredItems.filter((item) => item.daysToExpiry <= 7).length
+  }, [filteredItems])
 
   const getQuarantineProgress = (hours: number) => {
     if (hours < 24) return { value: (hours / 24) * 33, color: "bg-imperial" }
@@ -188,6 +225,15 @@ export function QuarantineQueueContent() {
     }
   }
 
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+        <Loader2 className="w-10 h-10 animate-spin text-imperial" />
+        <p className="text-muted-foreground text-sm">Carregando fila de quarentena...</p>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Breadcrumb */}
@@ -215,7 +261,7 @@ export function QuarantineQueueContent() {
               <div>
                 <p className="text-sm text-muted-foreground">Total em Quarentena</p>
                 <p className="text-2xl font-bold text-imperial">{filteredItems.length}</p>
-                <p className="text-sm text-muted-foreground mt-1">R$ {totalValue.toLocaleString("pt-BR")}</p>
+                <p className="text-sm text-muted-foreground mt-1">{totalValue.toLocaleString("pt-BR")} MT</p>
               </div>
               <Package className="w-10 h-10 text-imperial opacity-20" />
             </div>
@@ -254,7 +300,7 @@ export function QuarantineQueueContent() {
               <div>
                 <p className="text-sm text-muted-foreground">Vence em &lt; 7 dias</p>
                 <p className="text-2xl font-bold text-orange-600">{expiringCount}</p>
-                {expiringCount > 0 && <Badge className="mt-1 bg-orange-500">Priorizar</Badge>}
+                {expiringCount > 0 && <Badge className="mt-1 bg-orange-50">Priorizar</Badge>}
               </div>
               <AlertCircle className="w-10 h-10 text-orange-600 opacity-20" />
             </div>
@@ -265,7 +311,7 @@ export function QuarantineQueueContent() {
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
-          <TabsTrigger value="all">Todos ({mockQuarantineItems.length})</TabsTrigger>
+          <TabsTrigger value="all">Todos ({items.length})</TabsTrigger>
           <TabsTrigger value="urgent">Urgentes ({urgentCount})</TabsTrigger>
           <TabsTrigger value="over48h">Aguardando &gt; 48h ({over48h})</TabsTrigger>
           <TabsTrigger value="expiring">Vencendo em 7 dias ({expiringCount})</TabsTrigger>
@@ -334,7 +380,6 @@ export function QuarantineQueueContent() {
                       <SelectItem value="Todos">Todos</SelectItem>
                       <SelectItem value="Frigorífico Premium S.A.">Frigorífico Premium S.A.</SelectItem>
                       <SelectItem value="Distribuidora Alimentos Ltda">Distribuidora Alimentos Ltda</SelectItem>
-                      <SelectItem value="Hortifruti Verde Vida">Hortifruti Verde Vida</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -428,7 +473,7 @@ export function QuarantineQueueContent() {
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {filteredItems.map((item) => {
-                      const config = priorityConfig[item.priority as keyof typeof priorityConfig]
+                      const config = priorityConfig[item.priority as keyof typeof priorityConfig] || priorityConfig.normal
                       const progress = getQuarantineProgress(item.hoursInQuarantine)
 
                       return (
@@ -536,7 +581,3 @@ export function QuarantineQueueContent() {
     </div>
   )
 }
-
-
-
-

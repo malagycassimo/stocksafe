@@ -185,7 +185,7 @@ export function PoInvoicingContent() {
                 </div>
                 <div>
                   <div className="text-sm text-muted-foreground mb-1">Valor Total</div>
-                  <div className="font-medium text-imperial">{poData.totalValue.toFixed(2)} MZN</div>
+                  <div className="font-medium text-imperial">{poData.totalValue.toFixed(2)} MT</div>
                 </div>
                 <div>
                   <div className="text-sm text-muted-foreground mb-1">Data de Emissão</div>
@@ -284,7 +284,7 @@ export function PoInvoicingContent() {
                   <div className="flex items-center gap-2 mt-2 text-sm text-orange-600">
                     <AlertTriangle className="w-4 h-4" />
                     Valor divergente do PO ({Number.parseFloat(valueDifference) > 0 ? "+" : ""}
-                    {valueDifference} MZN)
+                    {valueDifference} MT)
                   </div>
                 )}
               </div>
@@ -305,7 +305,7 @@ export function PoInvoicingContent() {
                     </div>
                     <div>
                       <Label>Valor IVA</Label>
-                      <Input value={`${taxes.iva} MZN`} disabled />
+                      <Input value={`${taxes.iva} MT`} disabled />
                     </div>
                   </div>
 
@@ -322,7 +322,7 @@ export function PoInvoicingContent() {
                     </div>
                     <div>
                       <Label>Valor IRPS</Label>
-                      <Input value={`${taxes.irps} MZN`} disabled />
+                      <Input value={`${taxes.irps} MT`} disabled />
                     </div>
                   </div>
 
@@ -339,7 +339,7 @@ export function PoInvoicingContent() {
                     </div>
                     <div>
                       <Label>Total de Impostos</Label>
-                      <Input value={`${taxes.total} MZN`} disabled className="font-medium" />
+                      <Input value={`${taxes.total} MT`} disabled className="font-medium" />
                     </div>
                   </div>
                 </div>

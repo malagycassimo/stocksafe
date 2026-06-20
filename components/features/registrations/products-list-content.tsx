@@ -836,9 +836,105 @@ export function ProductsListContent() {
   }
 
   const handleExport = (format: string) => {
+    const itemsToExport = selectedProducts.length > 0
+      ? products.filter(p => selectedProducts.includes(p.id!))
+      : filteredProducts
+
+    if (itemsToExport.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Erro na exportação",
+        description: "Não existem produtos para exportar.",
+      })
+      return
+    }
+
+    if (format === "CSV" || format === "XLSX") {
+      const headers = ["SKU", "Descrição", "Categoria", "Vida Útil (Dias)", "Validade Mínima Recebimento (%)", "Controle Lote", "Status"]
+      const rows = itemsToExport.map(p => [
+        p.sku,
+        p.descricao,
+        p.categoria,
+        p.vida_util_dias,
+        p.validade_min_recebimento,
+        p.controle_lote ? "Sim" : "Não",
+        p.status_ativo ? "Ativo" : "Inativo"
+      ])
+
+      const csvContent = [headers, ...rows]
+        .map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(","))
+        .join("\n")
+
+      const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.setAttribute("href", url)
+      link.setAttribute("download", `produtos_${new Date().toISOString().slice(0, 10)}.${format === "XLSX" ? "xls" : "csv"}`)
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    } else if (format === "PDF") {
+      const printWindow = window.open("", "_blank")
+      if (printWindow) {
+        printWindow.document.write(`
+          <html>
+            <head>
+              <title>Relatório de Produtos - StockSafe</title>
+              <style>
+                body { font-family: sans-serif; padding: 20px; color: #333; }
+                h1 { color: #047857; border-bottom: 2px solid #047857; padding-bottom: 10px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 12px; }
+                th { background-color: #f3f4f6; font-weight: bold; }
+                .footer { margin-top: 30px; font-size: 10px; color: #666; text-align: center; }
+              </style>
+            </head>
+            <body>
+              <h1>Relatório de Produtos</h1>
+              <p>Gerado em: ${new Date().toLocaleString()}</p>
+              <table>
+                <thead>
+                  <tr>
+                    <th>SKU</th>
+                    <th>Descrição</th>
+                    <th>Categoria</th>
+                    <th>Vida Útil</th>
+                    <th>Validade Mínima</th>
+                    <th>Controle Lote</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${itemsToExport.map(p => `
+                    <tr>
+                      <td>${p.sku}</td>
+                      <td>${p.descricao}</td>
+                      <td>${p.categoria}</td>
+                      <td>${p.vida_util_dias} dias</td>
+                      <td>${p.validade_min_recebimento}%</td>
+                      <td>${p.controle_lote ? "Sim" : "Não"}</td>
+                      <td>${p.status_ativo ? "Ativo" : "Inativo"}</td>
+                    </tr>
+                  `).join("")}
+                </tbody>
+              </table>
+              <div class="footer">StockSafe - Sistema de Gestão de Estoque e Validades</div>
+              <script>
+                window.onload = function() {
+                  window.print();
+                  window.close();
+                }
+              </script>
+            </body>
+          </html>
+        `)
+        printWindow.document.close()
+      }
+    }
+
     toast({
-      title: "Exportação iniciada",
-      description: `Exportando ${selectedProducts.length > 0 ? selectedProducts.length : filteredProducts.length} produtos para ${format}`,
+      title: "Exportação concluída",
+      description: `${itemsToExport.length} produtos exportados com sucesso em formato ${format}.`,
     })
     setShowExportModal(false)
   }

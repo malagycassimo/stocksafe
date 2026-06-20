@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
@@ -9,7 +9,9 @@ import {
   AlertTriangle,
   CheckCircle2,
   X,
-  Thermometer,
+  Ban,
+  Pause,
+  Keyboard,
   ChevronLeft,
   ChevronRight,
   Package,
@@ -17,9 +19,7 @@ import {
   Download,
   Eye,
   Send,
-  Ban,
-  Pause,
-  Keyboard,
+  Thermometer,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/dialog"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
+import { recebimentoService } from "@/app/services/recebimentoService"
 
 // Mock data
 const mockPO = {
@@ -116,7 +117,57 @@ export function PhysicalInspectionContent({ poId, labelCode }: PhysicalInspectio
   const [finalObs, setFinalObs] = useState("")
   const [confirmReview, setConfirmReview] = useState(false)
 
-  const currentItem = mockPO.items[currentItemIndex]
+  const [po, setPo] = useState<any>(null)
+  const [poItems, setPoItems] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const finalPoId = poId || "PO-2025-001"
+
+  useEffect(() => {
+    if (!finalPoId) return
+    setLoading(true)
+    recebimentoService.getPurchaseOrder(finalPoId)
+      .then((data) => {
+        setPo(data)
+        if (data.itens && data.itens.length > 0) {
+          const mapped = data.itens.map((item: any, idx: number) => ({
+            id: idx + 1,
+            produtoId: item.produtoId,
+            sku: item.sku,
+            description: item.description,
+            category: item.category || "Geral",
+            image: "/glass-of-milk.png",
+            qtyExpected: item.qtyExpected,
+            unit: item.unit,
+            lotProposed: "LOTE-PROP",
+            expiryProposed: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            shelfLife: 180,
+            minValidityDays: 90,
+            minValidityPercent: 50,
+            datasheet: "CoA.pdf",
+            status: "pending"
+          }))
+          setPoItems(mapped)
+        }
+      })
+      .catch((err) => {
+        console.error(err)
+      })
+      .finally(() => {
+        setLoading(false)
+      })
+  }, [finalPoId])
+
+  const activePO = po ? {
+    id: po.codigo || po.id,
+    supplier: po.fornecedor?.razao_social || "Fornecedor",
+    checkinDate: po.checkIn ? new Date(po.checkIn.createdAt).toLocaleString("pt-BR") : "Check-in Pendente",
+    vehicleTemp: po.checkIn?.temperatura || 5.2,
+    items: poItems
+  } : mockPO
+
+  const activeItems = poItems.length > 0 ? poItems : mockPO.items
+  const currentItem = activeItems[currentItemIndex] || mockPO.items[0]
 
   // Calculate days until expiry and % of shelf life
   const calculateValidityInfo = (expiryDate: string) => {
@@ -218,7 +269,7 @@ export function PhysicalInspectionContent({ poId, labelCode }: PhysicalInspectio
     setShowAcceptDeviationModal(false)
     resetForm()
 
-    if (currentItemIndex < mockPO.items.length - 1) {
+    if (currentItemIndex < activeItems.length - 1) {
       setTimeout(() => {
         if (confirm("Ir para o próximo item?")) {
           setCurrentItemIndex(currentItemIndex + 1)
@@ -241,7 +292,7 @@ export function PhysicalInspectionContent({ poId, labelCode }: PhysicalInspectio
     setShowAcceptDeviationModal(false)
     resetForm()
 
-    if (currentItemIndex < mockPO.items.length - 1) {
+    if (currentItemIndex < activeItems.length - 1) {
       setCurrentItemIndex(currentItemIndex + 1)
     } else {
       setShowFinalizeModal(true)
@@ -258,7 +309,7 @@ export function PhysicalInspectionContent({ poId, labelCode }: PhysicalInspectio
     setShowQuarantineModal(false)
     resetForm()
 
-    if (currentItemIndex < mockPO.items.length - 1) {
+    if (currentItemIndex < activeItems.length - 1) {
       setCurrentItemIndex(currentItemIndex + 1)
     } else {
       setShowFinalizeModal(true)
@@ -279,7 +330,7 @@ export function PhysicalInspectionContent({ poId, labelCode }: PhysicalInspectio
     setShowRejectModal(false)
     resetForm()
 
-    if (currentItemIndex < mockPO.items.length - 1) {
+    if (currentItemIndex < activeItems.length - 1) {
       setCurrentItemIndex(currentItemIndex + 1)
     } else {
       setShowFinalizeModal(true)
@@ -309,7 +360,7 @@ export function PhysicalInspectionContent({ poId, labelCode }: PhysicalInspectio
     setNotifyQA(false)
   }
 
-  const progressPercent = ((currentItemIndex + 1) / mockPO.items.length) * 100
+  const progressPercent = ((currentItemIndex + 1) / activeItems.length) * 100
 
   return (
     <div className="h-[calc(100vh-64px)] flex flex-col">
@@ -337,22 +388,22 @@ export function PhysicalInspectionContent({ poId, labelCode }: PhysicalInspectio
           {/* PO Header */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-lg">PO {mockPO.id}</CardTitle>
+              <CardTitle className="text-lg">PO {activePO.id}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
               <div>
                 <span className="text-muted-foreground">Fornecedor:</span>
-                <div className="font-medium">{mockPO.supplier}</div>
+                <div className="font-medium">{activePO.supplier}</div>
               </div>
               <div>
                 <span className="text-muted-foreground">Check-in:</span>
-                <div className="font-medium">{mockPO.checkinDate}</div>
+                <div className="font-medium">{activePO.checkinDate}</div>
               </div>
               <div>
                 <span className="text-muted-foreground">Temperatura Veículo:</span>
                 <Badge className="bg-twilight text-imperial ml-2">
                   <Thermometer className="w-3 h-3 mr-1" />
-                  {mockPO.vehicleTemp}°C
+                  {activePO.vehicleTemp}°C
                 </Badge>
               </div>
             </CardContent>
@@ -366,7 +417,7 @@ export function PhysicalInspectionContent({ poId, labelCode }: PhysicalInspectio
             <CardContent>
               <Progress value={progressPercent} className="mb-2" />
               <div className="text-sm text-muted-foreground">
-                {currentItemIndex + 1} de {mockPO.items.length} itens conferidos ({Math.round(progressPercent)}%)
+                {currentItemIndex + 1} de {activeItems.length} itens conferidos ({Math.round(progressPercent)}%)
               </div>
             </CardContent>
           </Card>
@@ -377,7 +428,7 @@ export function PhysicalInspectionContent({ poId, labelCode }: PhysicalInspectio
               <CardTitle className="text-sm">Itens do PO</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              {mockPO.items.map((item, index) => (
+              {activeItems.map((item, index) => (
                 <div
                   key={item.id}
                   className={cn(
@@ -410,7 +461,7 @@ export function PhysicalInspectionContent({ poId, labelCode }: PhysicalInspectio
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm">
-                Item {currentItemIndex + 1} de {mockPO.items.length} - Dados Propostos
+                Item {currentItemIndex + 1} de {activeItems.length} - Dados Propostos
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -971,12 +1022,12 @@ export function PhysicalInspectionContent({ poId, labelCode }: PhysicalInspectio
               Item Anterior
             </Button>
             <div className="text-sm font-medium">
-              Item {currentItemIndex + 1} de {mockPO.items.length}
+              Item {currentItemIndex + 1} de {activeItems.length}
             </div>
             <Button
               variant="outline"
-              onClick={() => setCurrentItemIndex(Math.min(mockPO.items.length - 1, currentItemIndex + 1))}
-              disabled={currentItemIndex === mockPO.items.length - 1}
+              onClick={() => setCurrentItemIndex(Math.min(activeItems.length - 1, currentItemIndex + 1))}
+              disabled={currentItemIndex === activeItems.length - 1}
               className="bg-transparent"
             >
               Próximo Item
@@ -990,7 +1041,7 @@ export function PhysicalInspectionContent({ poId, labelCode }: PhysicalInspectio
               <span>⚠️ Com Desvio: 0</span>
               <span>🔴 Quarentena: 0</span>
               <span>❌ Rejeitados: 0</span>
-              <span>⚪ Pendentes: {mockPO.items.length}</span>
+              <span>⚪ Pendentes: {activeItems.length}</span>
             </div>
             <Button className="bg-imperial hover:bg-imperial" onClick={() => setShowFinalizeModal(true)}>
               Finalizar Conferência
@@ -1248,13 +1299,13 @@ export function PhysicalInspectionContent({ poId, labelCode }: PhysicalInspectio
       <Dialog open={showFinalizeModal} onOpenChange={setShowFinalizeModal}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Finalizar Conferência do PO #{mockPO.id}</DialogTitle>
+            <DialogTitle>Finalizar Conferência do PO #{activePO.id}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
               <div>
                 <div className="text-sm text-muted-foreground">Total de Itens</div>
-                <div className="text-2xl font-bold">{mockPO.items.length}</div>
+                <div className="text-2xl font-bold">{activeItems.length}</div>
               </div>
               <div>
                 <div className="text-sm text-muted-foreground">✅ Recebidos Conformes</div>
@@ -1274,15 +1325,15 @@ export function PhysicalInspectionContent({ poId, labelCode }: PhysicalInspectio
               </div>
               <div>
                 <div className="text-sm text-muted-foreground">⚪ Não Conferidos</div>
-                <div className="text-2xl font-bold text-gray-600">{mockPO.items.length}</div>
+                <div className="text-2xl font-bold text-gray-600">{activeItems.length}</div>
               </div>
             </div>
 
-            {mockPO.items.length > 0 && (
+            {activeItems.length > 0 && (
               <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                 <AlertTriangle className="w-5 h-5 text-yellow-600 mb-2" />
                 <p className="text-sm font-medium text-yellow-800">
-                  {mockPO.items.length} itens ainda não foram conferidos
+                  {activeItems.length} itens ainda não foram conferidos
                 </p>
                 <div className="mt-2 space-y-1">
                   <div className="flex items-center space-x-2">

@@ -116,7 +116,8 @@ export function DisposalsContent() {
   }
 
   const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val)
+    const formattedVal = new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val)
+    return `${formattedVal} MT`
   }
 
   return (

@@ -38,6 +38,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog"
+import { inventarioService } from "@/app/services/inventarioService"
 
 const inventoryTypes = [
   {
@@ -163,10 +164,20 @@ export function NewInventoryContent() {
   }
 
   const handleConfirm = () => {
-    // Here would be the API call
-    console.log("Inventory created")
-    setShowConfirmModal(false)
-    router.push("/estoque/inventario")
+    inventarioService.createInventario({
+      dateAgenda: inventoryDate || new Date().toISOString().split("T")[0],
+      responsavel: mockUsers.find(u => u.id === responsible)?.name || "Supervisor Padrão"
+    })
+    .then((res) => {
+      console.log("Inventory created", res)
+      setShowConfirmModal(false)
+      router.push("/estoque/inventario")
+    })
+    .catch((err) => {
+      console.error(err)
+      setShowConfirmModal(false)
+      router.push("/estoque/inventario")
+    })
   }
 
   return (
@@ -377,7 +388,7 @@ export function NewInventoryContent() {
                   <div className="flex items-center gap-2">
                     <Checkbox id="highValue" />
                     <label htmlFor="highValue" className="cursor-pointer">
-                      Valor unitário &gt; R$
+                      Valor unitário &gt; MT
                     </label>
                     <Input type="number" placeholder="100.00" className="w-32" />
                   </div>

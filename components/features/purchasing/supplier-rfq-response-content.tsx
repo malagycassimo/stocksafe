@@ -61,7 +61,7 @@ export function SupplierRfqResponseContent() {
       proposedExpiry: "",
       datasheet: "",
       unitPrice: "",
-      currency: "MZN",
+      currency: "MT",
       deliveryTime: "",
       deliveryUnit: "dias",
       observations: "",
@@ -80,7 +80,7 @@ export function SupplierRfqResponseContent() {
       proposedExpiry: "",
       datasheet: "",
       unitPrice: "",
-      currency: "MZN",
+      currency: "MT",
       deliveryTime: "",
       deliveryUnit: "dias",
       observations: "",
@@ -427,7 +427,7 @@ export function SupplierRfqResponseContent() {
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="MZN">MZN</SelectItem>
+                                <SelectItem value="MT">MT</SelectItem>
                                 <SelectItem value="USD">USD</SelectItem>
                                 <SelectItem value="EUR">EUR</SelectItem>
                               </SelectContent>
@@ -499,7 +499,7 @@ export function SupplierRfqResponseContent() {
             </div>
             <div>
               <Label className="text-muted-foreground">Valor Total</Label>
-              <div className="text-2xl font-bold text-imperial">{totalValue.toFixed(2)} MZN</div>
+              <div className="text-2xl font-bold text-imperial">{totalValue.toFixed(2)} MT</div>
             </div>
             <div>
               <Label className="text-muted-foreground">Prazo Médio</Label>
@@ -683,7 +683,7 @@ export function SupplierRfqResponseContent() {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Valor Total:</span>
-                <span className="font-medium text-imperial">{totalValue.toFixed(2)} MZN</span>
+                <span className="font-medium text-imperial">{totalValue.toFixed(2)} MT</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Itens Completos:</span>

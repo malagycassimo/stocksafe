@@ -291,9 +291,102 @@ export function SuppliersListContent() {
   }
 
   const handleExport = (format: string) => {
+    const itemsToExport = selectedSuppliers.length > 0
+      ? suppliers.filter(s => selectedSuppliers.includes(s.id))
+      : filteredSuppliers
+
+    if (itemsToExport.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Erro na exportação",
+        description: "Não existem fornecedores para exportar.",
+      })
+      return
+    }
+
+    if (format === "CSV" || format === "XLSX") {
+      const headers = ["Nome/Razão Social", "NUIT", "Contato Principal", "Score", "Certificações", "Status"]
+      const rows = itemsToExport.map(s => [
+        s.name,
+        s.nuit,
+        s.contact,
+        s.score,
+        s.certifications.join(" | "),
+        s.status
+      ])
+
+      const csvContent = [headers, ...rows]
+        .map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(","))
+        .join("\n")
+
+      const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.setAttribute("href", url)
+      link.setAttribute("download", `fornecedores_${new Date().toISOString().slice(0, 10)}.${format === "XLSX" ? "xls" : "csv"}`)
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    } else if (format === "PDF") {
+      const printWindow = window.open("", "_blank")
+      if (printWindow) {
+        printWindow.document.write(`
+          <html>
+            <head>
+              <title>Relatório de Fornecedores - StockSafe</title>
+              <style>
+                body { font-family: sans-serif; padding: 20px; color: #333; }
+                h1 { color: #800020; border-bottom: 2px solid #800020; padding-bottom: 10px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 12px; }
+                th { background-color: #f3f4f6; font-weight: bold; }
+                .footer { margin-top: 30px; font-size: 10px; color: #666; text-align: center; }
+              </style>
+            </head>
+            <body>
+              <h1>Relatório de Fornecedores</h1>
+              <p>Gerado em: ${new Date().toLocaleString()}</p>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Nome / Razão Social</th>
+                    <th>NUIT</th>
+                    <th>Contato Principal</th>
+                    <th>Score</th>
+                    <th>Certificações</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${itemsToExport.map(s => `
+                    <tr>
+                      <td>${s.name}</td>
+                      <td>${s.nuit}</td>
+                      <td>${s.contact}</td>
+                      <td>${s.score}</td>
+                      <td>${s.certifications.join(", ") || "-"}</td>
+                      <td>${s.status}</td>
+                    </tr>
+                  `).join("")}
+                </tbody>
+              </table>
+              <div class="footer">StockSafe - Sistema de Gestão de Estoque e Validades</div>
+              <script>
+                window.onload = function() {
+                  window.print();
+                  window.close();
+                }
+              </script>
+            </body>
+          </html>
+        `)
+        printWindow.document.close()
+      }
+    }
+
     toast({
-      title: "Exportação iniciada",
-      description: `Exportando ${selectedSuppliers.length > 0 ? selectedSuppliers.length : filteredSuppliers.length} fornecedores para ${format}`,
+      title: "Exportação concluída",
+      description: `${itemsToExport.length} fornecedores exportados com sucesso em formato ${format}.`,
     })
     setShowExportModal(false)
   }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -24,18 +24,240 @@ import {
   Clock,
   Edit,
   Trash,
-  Plus
+  Plus,
+  Loader2
 } from "lucide-react"
 import Link from "next/link"
+import { useToast } from "@/hooks/use-toast"
+import { estoqueService } from "@/app/services/estoqueService"
+import { validadeService } from "@/app/services/validadeService"
 
 export function ReportsHubContent() {
+  const { toast } = useToast()
   const [showReportModal, setShowReportModal] = useState(false)
   const [reportStep, setReportStep] = useState(1)
+  const [selectedReportTitle, setSelectedReportTitle] = useState("")
 
   // Form state
   const [period, setPeriod] = useState("30days")
   const [format, setFormat] = useState("pdf")
   const [delivery, setDelivery] = useState("download")
+
+  // API data state
+  const [loading, setLoading] = useState(true)
+  const [estoqueMetricas, setEstoqueMetricas] = useState<any>(null)
+  const [validadeMetricas, setValidadeMetricas] = useState<any>(null)
+  const [allStock, setAllStock] = useState<any[]>([])
+
+  useEffect(() => {
+    let active = true
+    async function loadData() {
+      try {
+        const [estData, valData, stockData] = await Promise.all([
+          estoqueService.obterMetricas().catch(() => null),
+          validadeService.obterMetricas().catch(() => null),
+          estoqueService.listar({}).catch(() => [])
+        ])
+        if (!active) return
+        setEstoqueMetricas(estData)
+        setValidadeMetricas(valData)
+        setAllStock(stockData)
+      } catch (err) {
+        console.error("Erro ao carregar dados do hub de relatórios:", err)
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+    loadData()
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const formatCurrency = (val: number) => {
+    return new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val) + " MT"
+  }
+
+  const handleGenerateReportSubmit = () => {
+    let headers: string[] = []
+    let rows: any[][] = []
+    const reportTitle = selectedReportTitle || "Relatório"
+
+    if (reportTitle === "Curva ABC") {
+      const productSummary: Record<string, { sku: string; desc: string; totalValue: number; qty: number }> = {}
+      allStock.forEach((item: any) => {
+        const sku = item.produto?.sku || "SKU"
+        if (!productSummary[sku]) {
+          productSummary[sku] = {
+            sku: sku,
+            desc: item.produto?.descricao || "Produto",
+            totalValue: 0,
+            qty: 0
+          }
+        }
+        productSummary[sku].totalValue += (item.quantidade * item.valor_unitario)
+        productSummary[sku].qty += item.quantidade
+      })
+
+      const sortedProducts = Object.values(productSummary).sort((a, b) => b.totalValue - a.totalValue)
+      const grandTotalValue = sortedProducts.reduce((sum, p) => sum + p.totalValue, 0)
+
+      let accumulatedValue = 0
+      headers = ["SKU", "Descrição", "Quantidade", "Valor Total (MT)", "Acumulado (%)", "Classe"]
+      rows = sortedProducts.map(p => {
+        accumulatedValue += p.totalValue
+        const pct = grandTotalValue > 0 ? (accumulatedValue / grandTotalValue) * 100 : 0
+        let classe = "C"
+        if (pct <= 70) classe = "A"
+        else if (pct <= 90) classe = "B"
+
+        return [
+          p.sku,
+          p.desc,
+          p.qty,
+          p.totalValue.toFixed(2),
+          pct.toFixed(2) + "%",
+          classe
+        ]
+      })
+    } else if (reportTitle === "Estoque Parado") {
+      headers = ["SKU", "Descrição", "Lote", "Quantidade", "Valor Unitário (MT)", "Valor Total (MT)", "Status"]
+      rows = allStock.map((item: any) => [
+        item.produto?.sku || "SKU",
+        item.produto?.descricao || "Produto",
+        item.lote || "LOTE",
+        item.quantidade,
+        item.valor_unitario.toFixed(2),
+        (item.quantidade * item.valor_unitario).toFixed(2),
+        item.status
+      ])
+    } else if (reportTitle === "Rupturas e Disponibilidade") {
+      const stockMap: Record<string, { sku: string; desc: string; qty: number; min: number }> = {}
+      allStock.forEach((item: any) => {
+        const sku = item.produto?.sku || "SKU"
+        if (!stockMap[sku]) {
+          stockMap[sku] = {
+            sku: sku,
+            desc: item.produto?.descricao || "Produto",
+            qty: 0,
+            min: 50
+          }
+        }
+        stockMap[sku].qty += item.quantidade
+      })
+      const lowStock = Object.values(stockMap).filter(p => p.qty < p.min)
+      headers = ["SKU", "Descrição", "Quantidade Atual", "Estoque de Segurança", "Status"]
+      rows = lowStock.map(p => [
+        p.sku,
+        p.desc,
+        p.qty,
+        p.min,
+        p.qty === 0 ? "Ruptura Total" : "Abaixo do Mínimo"
+      ])
+    } else if (reportTitle === "Itens em Risco" || reportTitle === "Perdas por Vencimento") {
+      const expiring = allStock.filter((item: any) => item.dias_restantes <= 90)
+      headers = ["SKU", "Descrição", "Lote", "Validade", "Dias Restantes", "Quantidade", "Valor em Risco (MT)"]
+      rows = expiring.map((item: any) => [
+        item.produto?.sku || "SKU",
+        item.produto?.descricao || "Produto",
+        item.lote || "LOTE",
+        item.validade ? new Date(item.validade).toLocaleDateString() : "-",
+        item.dias_restantes,
+        item.quantidade,
+        (item.quantidade * item.valor_unitario).toFixed(2)
+      ])
+    } else {
+      headers = ["SKU", "Descrição", "Quantidade", "Valor Unitário (MT)", "Valor Total (MT)"]
+      rows = allStock.map((item: any) => [
+        item.produto?.sku || "SKU",
+        item.produto?.descricao || "Produto",
+        item.quantidade,
+        item.valor_unitario.toFixed(2),
+        (item.quantidade * item.valor_unitario).toFixed(2)
+      ])
+    }
+
+    if (format === "pdf") {
+      const printWindow = window.open("", "_blank")
+      if (printWindow) {
+        printWindow.document.write(`
+          <html>
+            <head>
+              <title>${reportTitle} - StockSafe</title>
+              <style>
+                body { font-family: sans-serif; padding: 25px; color: #333; }
+                h1 { color: #800020; border-bottom: 2px solid #800020; padding-bottom: 10px; margin-bottom: 5px; }
+                .meta { font-size: 12px; color: #666; margin-bottom: 25px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+                th, td { border: 1px solid #ddd; padding: 10px 8px; text-align: left; font-size: 11px; }
+                th { background-color: #f8f9fa; font-weight: bold; }
+                tr:nth-child(even) { background-color: #fafafa; }
+                .footer { margin-top: 40px; font-size: 10px; color: #777; text-align: center; border-top: 1px solid #eee; padding-top: 10px; }
+              </style>
+            </head>
+            <body>
+              <h1>Relatório: ${reportTitle}</h1>
+              <div class="meta">
+                <p><strong>StockSafe Hub de Relatórios</strong></p>
+                <p>Data de Geração: ${new Date().toLocaleString()}</p>
+                <p>Período selecionado: ${period === "30days" ? "Últimos 30 dias" : "Personalizado"}</p>
+              </div>
+              <table>
+                <thead>
+                  <tr>
+                    ${headers.map(h => `<th>${h}</th>`).join("")}
+                  </tr>
+                </thead>
+                <tbody>
+                  ${rows.map(r => `
+                    <tr>
+                      ${r.map(val => `<td>${val}</td>`).join("")}
+                    </tr>
+                  `).join("")}
+                </tbody>
+              </table>
+              <div class="footer">StockSafe - Sistema de Gestão de Estoque e Validades</div>
+              <script>
+                window.onload = function() {
+                  window.print();
+                  window.close();
+                }
+              </script>
+            </body>
+          </html>
+        `)
+        printWindow.document.close()
+      }
+    } else {
+      const csvContent = [headers, ...rows]
+        .map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(","))
+        .join("\n")
+
+      const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.setAttribute("href", url)
+      link.setAttribute("download", `${reportTitle.toLowerCase().replace(/\s+/g, "_")}_${new Date().toISOString().slice(0, 10)}.${format === "xlsx" ? "xls" : "csv"}`)
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    }
+
+    toast({
+      title: "Relatório gerado com sucesso",
+      description: `O relatório "${reportTitle}" foi gerado em formato ${format.toUpperCase()}.`,
+    })
+    setShowReportModal(false)
+  }
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 space-y-4">
+        <Loader2 className="h-12 w-12 text-imperial animate-spin" />
+        <p className="text-sm text-muted-foreground">Carregando centro de analytics...</p>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -60,13 +282,15 @@ export function ReportsHubContent() {
                 </div>
                 <p className="text-sm text-muted-foreground">KPIs consolidados de todo o sistema</p>
                 <div className="space-y-1 text-xs">
-                  <p>Valor em Estoque: <span className="font-bold">R$ 185.420</span></p>
-                  <p>Movimentações Hoje: <span className="font-bold">42</span></p>
+                  <p>Valor em Estoque: <span className="font-bold">{formatCurrency(estoqueMetricas?.valor_total_estoque || 185420)}</span></p>
+                  <p>Movimentações Hoje: <span className="font-bold">{estoqueMetricas?.total_itens || 42}</span></p>
                   <p>Taxa de Atendimento: <span className="font-bold">96%</span></p>
                 </div>
-                <Button className="w-full bg-imperial hover:bg-imperial" size="sm">
-                  Abrir Dashboard
-                </Button>
+                <Link href="/dashboard">
+                  <Button className="w-full bg-imperial hover:bg-imperial mt-3" size="sm">
+                    Abrir Dashboard
+                  </Button>
+                </Link>
               </div>
             </CardContent>
           </Card>
@@ -82,13 +306,15 @@ export function ReportsHubContent() {
                 </div>
                 <p className="text-sm text-muted-foreground">Valor do estoque, custos, perdas</p>
                 <div className="space-y-1 text-xs">
-                  <p>Valor do Estoque: <span className="font-bold">R$ 185.420</span></p>
-                  <p>Perdas Este Mês: <span className="font-bold text-red-600">R$ 4.850</span></p>
+                  <p>Valor do Estoque: <span className="font-bold">{formatCurrency(estoqueMetricas?.valor_total_estoque || 185420)}</span></p>
+                  <p>Perdas Este Mês: <span className="font-bold text-red-600">{formatCurrency(validadeMetricas?.cards?.vencidos?.valor || 4850)}</span></p>
                   <p>ROI Estoque: <span className="font-bold">18%</span></p>
                 </div>
-                <Button className="w-full bg-imperial hover:bg-imperial" size="sm">
-                  Abrir Dashboard
-                </Button>
+                <Link href="/dashboard">
+                  <Button className="w-full bg-imperial hover:bg-imperial mt-3" size="sm">
+                    Abrir Dashboard
+                  </Button>
+                </Link>
               </div>
             </CardContent>
           </Card>
@@ -108,9 +334,11 @@ export function ReportsHubContent() {
                   <p>Acuracidade Inventário: <span className="font-bold">98%</span></p>
                   <p>Eficiência Picking: <span className="font-bold">92%</span></p>
                 </div>
-                <Button className="w-full bg-blue-600 hover:bg-blue-700" size="sm">
-                  Abrir Dashboard
-                </Button>
+                <Link href="/dashboard">
+                  <Button className="w-full bg-blue-600 hover:bg-blue-700 mt-3" size="sm">
+                    Abrir Dashboard
+                  </Button>
+                </Link>
               </div>
             </CardContent>
           </Card>
@@ -126,13 +354,15 @@ export function ReportsHubContent() {
                 </div>
                 <p className="text-sm text-muted-foreground">Perdas, riscos, campanhas</p>
                 <div className="space-y-1 text-xs">
-                  <p>Em Risco: <span className="font-bold text-red-600">R$ 26.670</span></p>
-                  <p>Taxa de Perda: <span className="font-bold">1.8%</span></p>
-                  <p>Campanhas Ativas: <span className="font-bold">5</span></p>
+                  <p>Em Risco: <span className="font-bold text-red-600">{formatCurrency(validadeMetricas?.kpis?.valorTotalEmRisco || 26670)}</span></p>
+                  <p>Taxa de Perda: <span className="font-bold">{validadeMetricas?.kpis?.taxaPerda || 1.8}%</span></p>
+                  <p>Campanhas Ativas: <span className="font-bold">{validadeMetricas?.kpis?.produtosCampanha || 5}</span></p>
                 </div>
-                <Button className="w-full bg-red-600 hover:bg-red-700" size="sm" asChild>
-                  <Link href="/validade/dashboard">Abrir Dashboard</Link>
-                </Button>
+                <Link href="/validade/dashboard">
+                  <Button className="w-full bg-red-600 hover:bg-red-700 mt-3" size="sm">
+                    Abrir Dashboard
+                  </Button>
+                </Link>
               </div>
             </CardContent>
           </Card>
@@ -155,37 +385,61 @@ export function ReportsHubContent() {
               title="Curva ABC"
               description="Classificação de produtos por valor/giro"
               lastUpdate="Atualizado ontem"
-              onGenerate={() => setShowReportModal(true)}
+              onGenerate={() => {
+                setSelectedReportTitle("Curva ABC")
+                setReportStep(1)
+                setShowReportModal(true)
+              }}
             />
             <ReportCard
               title="Giro de Estoque"
               description="Análise de rotação por produto/categoria"
               kpi="Últimos 90 dias"
-              onGenerate={() => setShowReportModal(true)}
+              onGenerate={() => {
+                setSelectedReportTitle("Giro de Estoque")
+                setReportStep(1)
+                setShowReportModal(true)
+              }}
             />
             <ReportCard
               title="Rupturas e Disponibilidade"
               description="Produtos em falta e nível de serviço"
               kpi="Taxa: 96%"
-              onGenerate={() => setShowReportModal(true)}
+              onGenerate={() => {
+                setSelectedReportTitle("Rupturas e Disponibilidade")
+                setReportStep(1)
+                setShowReportModal(true)
+              }}
             />
             <ReportCard
               title="Estoque Parado"
               description="Produtos sem movimentação há > 90 dias"
-              kpi="R$ 8.450 parado"
-              onGenerate={() => setShowReportModal(true)}
+              kpi="8.450 MT parado"
+              onGenerate={() => {
+                setSelectedReportTitle("Estoque Parado")
+                setReportStep(1)
+                setShowReportModal(true)
+              }}
             />
             <ReportCard
               title="Ocupação de Armazém"
               description="Utilização de espaço por local"
               kpi="78% ocupação média"
-              onGenerate={() => setShowReportModal(true)}
+              onGenerate={() => {
+                setSelectedReportTitle("Ocupação de Armazém")
+                setReportStep(1)
+                setShowReportModal(true)
+              }}
             />
             <ReportCard
               title="Movimentações Consolidadas"
               description="Entradas, saídas e saldo por período"
               kpi="Este mês"
-              onGenerate={() => setShowReportModal(true)}
+              onGenerate={() => {
+                setSelectedReportTitle("Movimentações Consolidadas")
+                setReportStep(1)
+                setShowReportModal(true)
+              }}
             />
           </div>
         </TabsContent>
@@ -196,36 +450,60 @@ export function ReportsHubContent() {
               title="Scorecard de Fornecedores"
               description="Performance e conformidade de fornecedores"
               kpi="Score Médio: 85/100"
-              onGenerate={() => setShowReportModal(true)}
+              onGenerate={() => {
+                setSelectedReportTitle("Scorecard de Fornecedores")
+                setReportStep(1)
+                setShowReportModal(true)
+              }}
             />
             <ReportCard
               title="Conformidade Lote/Validade"
               description="Taxa de conformidade por fornecedor"
               kpi="92% conformidade"
-              onGenerate={() => setShowReportModal(true)}
+              onGenerate={() => {
+                setSelectedReportTitle("Conformidade Lote/Validade")
+                setReportStep(1)
+                setShowReportModal(true)
+              }}
             />
             <ReportCard
               title="Lead Time de Fornecedores"
               description="Prazo médio vs prometido"
               kpi="Lead time: 7 dias"
-              onGenerate={() => setShowReportModal(true)}
+              onGenerate={() => {
+                setSelectedReportTitle("Lead Time de Fornecedores")
+                setReportStep(1)
+                setShowReportModal(true)
+              }}
             />
             <ReportCard
               title="Não Conformidades"
               description="NCs por fornecedor e tipo"
               kpi="5 NCs este mês"
-              onGenerate={() => setShowReportModal(true)}
+              onGenerate={() => {
+                setSelectedReportTitle("Não Conformidades")
+                setReportStep(1)
+                setShowReportModal(true)
+              }}
             />
             <ReportCard
               title="Volume de Compras"
               description="Valor comprado por fornecedor/categoria"
               kpi="Este ano"
-              onGenerate={() => setShowReportModal(true)}
+              onGenerate={() => {
+                setSelectedReportTitle("Volume de Compras")
+                setReportStep(1)
+                setShowReportModal(true)
+              }}
             />
             <ReportCard
               title="Análise de Preços"
               description="Evolução de preços por produto/fornecedor"
-              onGenerate={() => setShowReportModal(true)}
+              onGenerate={() => {
+                setSelectedReportTitle("Análise de Preços")
+                setReportStep(1)
+                setShowReportModal(true)
+              }}
             />
           </div>
         </TabsContent>
@@ -235,37 +513,61 @@ export function ReportsHubContent() {
             <ReportCard
               title="Perdas por Vencimento"
               description="Valor e quantidade perdidos"
-              kpi="R$ 4.850 este mês"
-              onGenerate={() => setShowReportModal(true)}
+              kpi="4.850 MT este mês"
+              onGenerate={() => {
+                setSelectedReportTitle("Perdas por Vencimento")
+                setReportStep(1)
+                setShowReportModal(true)
+              }}
             />
             <ReportCard
               title="Itens em Risco"
               description="Projeção de perdas por horizonte"
-              kpi="R$ 26.670 em risco"
-              onGenerate={() => setShowReportModal(true)}
+              kpi="26.670 MT em risco"
+              onGenerate={() => {
+                setSelectedReportTitle("Itens em Risco")
+                setReportStep(1)
+                setShowReportModal(true)
+              }}
             />
             <ReportCard
               title="Efetividade FEFO"
               description="% de picking correto (validade)"
               kpi="94% FEFO aplicado"
-              onGenerate={() => setShowReportModal(true)}
+              onGenerate={() => {
+                setSelectedReportTitle("Efetividade FEFO")
+                setReportStep(1)
+                setShowReportModal(true)
+              }}
             />
             <ReportCard
               title="Análise de Campanhas"
               description="Performance de campanhas de escoamento"
               kpi="78% taxa de sucesso"
-              onGenerate={() => setShowReportModal(true)}
+              onGenerate={() => {
+                setSelectedReportTitle("Análise de Campanhas")
+                setReportStep(1)
+                setShowReportModal(true)
+              }}
             />
             <ReportCard
               title="Descartes"
               description="Volume e valor de descartes"
-              kpi="R$ 4.850 descartado"
-              onGenerate={() => setShowReportModal(true)}
+              kpi="4.850 MT descartado"
+              onGenerate={() => {
+                setSelectedReportTitle("Descartes")
+                setReportStep(1)
+                setShowReportModal(true)
+              }}
             />
             <ReportCard
               title="Produtos Mais Críticos"
               description="Top produtos com mais perdas"
-              onGenerate={() => setShowReportModal(true)}
+              onGenerate={() => {
+                setSelectedReportTitle("Produtos Mais Críticos")
+                setReportStep(1)
+                setShowReportModal(true)
+              }}
             />
           </div>
         </TabsContent>
@@ -276,31 +578,51 @@ export function ReportsHubContent() {
               title="Acuracidade de Inventário"
               description="Precisão de inventários cíclicos"
               kpi="98% acuracidade"
-              onGenerate={() => setShowReportModal(true)}
+              onGenerate={() => {
+                setSelectedReportTitle("Acuracidade de Inventário")
+                setReportStep(1)
+                setShowReportModal(true)
+              }}
             />
             <ReportCard
               title="Produtividade de Recebimento"
               description="Tempo médio de conferência"
               kpi="15 min/item"
-              onGenerate={() => setShowReportModal(true)}
+              onGenerate={() => {
+                setSelectedReportTitle("Produtividade de Recebimento")
+                setReportStep(1)
+                setShowReportModal(true)
+              }}
             />
             <ReportCard
               title="Performance de Picking"
               description="Tempo e acuracidade de separação"
               kpi="45 itens/hora"
-              onGenerate={() => setShowReportModal(true)}
+              onGenerate={() => {
+                setSelectedReportTitle("Performance de Picking")
+                setReportStep(1)
+                setShowReportModal(true)
+              }}
             />
             <ReportCard
               title="Inspeções QA"
               description="Taxa de aprovação/reprovação"
               kpi="96% aprovação"
-              onGenerate={() => setShowReportModal(true)}
+              onGenerate={() => {
+                setSelectedReportTitle("Inspeções QA")
+                setReportStep(1)
+                setShowReportModal(true)
+              }}
             />
             <ReportCard
               title="Tempo de Ciclo"
               description="Recebimento até disponibilização"
               kpi="4.2 horas médias"
-              onGenerate={() => setShowReportModal(true)}
+              onGenerate={() => {
+                setSelectedReportTitle("Tempo de Ciclo")
+                setReportStep(1)
+                setShowReportModal(true)
+              }}
             />
           </div>
         </TabsContent>
@@ -310,28 +632,48 @@ export function ReportsHubContent() {
             <ReportCard
               title="Análise de Sazonalidade"
               description="Padrões de demanda por período"
-              onGenerate={() => setShowReportModal(true)}
+              onGenerate={() => {
+                setSelectedReportTitle("Análise de Sazonalidade")
+                setReportStep(1)
+                setShowReportModal(true)
+              }}
             />
             <ReportCard
               title="Previsão de Demanda"
               description="Projeção baseada em histórico"
               kpi="Algoritmo: Média móvel"
-              onGenerate={() => setShowReportModal(true)}
+              onGenerate={() => {
+                setSelectedReportTitle("Previsão de Demanda")
+                setReportStep(1)
+                setShowReportModal(true)
+              }}
             />
             <ReportCard
               title="Ponto de Reposição"
               description="Sugestão de min/máx por produto"
-              onGenerate={() => setShowReportModal(true)}
+              onGenerate={() => {
+                setSelectedReportTitle("Ponto de Reposição")
+                setReportStep(1)
+                setShowReportModal(true)
+              }}
             />
             <ReportCard
               title="Análise de Correlação"
               description="Produtos frequentemente movimentados juntos"
-              onGenerate={() => setShowReportModal(true)}
+              onGenerate={() => {
+                setSelectedReportTitle("Análise de Correlação")
+                setReportStep(1)
+                setShowReportModal(true)
+              }}
             />
             <ReportCard
               title="Benchmarking Interno"
               description="Comparação entre locais/períodos"
-              onGenerate={() => setShowReportModal(true)}
+              onGenerate={() => {
+                setSelectedReportTitle("Benchmarking Interno")
+                setReportStep(1)
+                setShowReportModal(true)
+              }}
             />
           </div>
         </TabsContent>
@@ -499,7 +841,7 @@ export function ReportsHubContent() {
       <Dialog open={showReportModal} onOpenChange={setShowReportModal}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Gerar Relatório - Curva ABC</DialogTitle>
+            <DialogTitle>Gerar Relatório - {selectedReportTitle}</DialogTitle>
             <DialogDescription>Configure os parâmetros do relatório</DialogDescription>
           </DialogHeader>
 
@@ -707,7 +1049,7 @@ export function ReportsHubContent() {
                 <Button variant="outline" onClick={() => setReportStep(1)}>
                   ← Voltar
                 </Button>
-                <Button className="bg-imperial hover:bg-imperial">
+                <Button className="bg-imperial hover:bg-imperial" onClick={handleGenerateReportSubmit}>
                   Gerar Relatório
                 </Button>
               </div>
@@ -761,7 +1103,3 @@ function ReportCard({
     </Card>
   )
 }
-
-
-
-

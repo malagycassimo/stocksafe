@@ -42,7 +42,7 @@ export function CampaignsListContent() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Valor em Campanha</p>
-                <p className="text-3xl font-bold">R$ 45.200</p>
+                <p className="text-3xl font-bold">45.200 MT</p>
               </div>
               <DollarSign className="h-8 w-8 text-blue-600" />
             </div>
@@ -66,7 +66,7 @@ export function CampaignsListContent() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Economia Este Mês</p>
-                <p className="text-3xl font-bold text-imperial">R$ 12.850</p>
+                <p className="text-3xl font-bold text-imperial">12.850 MT</p>
               </div>
               <DollarSign className="h-8 w-8 text-imperial" />
             </div>
@@ -125,7 +125,7 @@ export function CampaignsListContent() {
                     </Button>
                   </td>
                   <td className="p-2 text-right">
-                    <p className="font-bold">R$ 8.920,00</p>
+                    <p className="font-bold">8.920,00 MT</p>
                     <p className="text-xs text-muted-foreground">12% estoque</p>
                   </td>
                   <td className="p-2">
@@ -188,7 +188,7 @@ export function CampaignsListContent() {
                     </Button>
                   </td>
                   <td className="p-2 text-right">
-                    <p className="font-bold">R$ 5.200,00</p>
+                    <p className="font-bold">5.200,00 MT</p>
                     <p className="text-xs text-muted-foreground">7% estoque</p>
                   </td>
                   <td className="p-2">
@@ -245,7 +245,7 @@ export function CampaignsListContent() {
                     <p className="font-medium">25</p>
                   </td>
                   <td className="p-2 text-right">
-                    <p className="font-bold">R$ 18.500,00</p>
+                    <p className="font-bold">18.500,00 MT</p>
                   </td>
                   <td className="p-2">
                     <div className="space-y-1">

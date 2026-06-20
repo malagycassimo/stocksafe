@@ -1,8 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { comprasService } from "@/app/services/comprasService"
+import { fornecedorService } from "@/app/services/fornecedorService"
+import { produtoService } from "@/app/services/produtoService"
+import { requisicaoService } from "@/app/services/requisicaoService"
 import { Save, Send, Plus, Trash2, Upload, AlertCircle, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -67,29 +71,99 @@ export function NewRfqContent() {
   const [sendEmail, setSendEmail] = useState(true)
   const [sendSMS, setSendSMS] = useState(false)
   const [showSupplierModal, setShowSupplierModal] = useState(false)
+  const [suppliers, setSuppliers] = useState<any[]>([])
 
-  const [items, setItems] = useState<RfqItem[]>([
-    {
-      id: "1",
-      sku: "LMP-001",
-      description: "Detergente Neutro - 5L",
-      quantity: 10,
-      unit: "UN",
-      minValidity: "80%",
-      specifications: "",
-      visibleToSupplier: true,
-    },
-    {
-      id: "2",
-      sku: "LMP-015",
-      description: "Desinfetante Multiuso - 2L",
-      quantity: 15,
-      unit: "UN",
-      minValidity: "90%",
-      specifications: "",
-      visibleToSupplier: true,
-    },
-  ])
+  // Dynamic products and RIs
+  const [approvedRIs, setApprovedRIs] = useState<any[]>([])
+  const [products, setProducts] = useState<any[]>([])
+  const [showAddProductModal, setShowAddProductModal] = useState(false)
+  const [selectedProductToAdd, setSelectedProductToAdd] = useState("")
+  const [quantityToAdd, setQuantityToAdd] = useState(1)
+
+  useEffect(() => {
+    // Load suppliers
+    fornecedorService.listarTodos()
+      .then((data) => {
+        setSuppliers(data.map((f) => ({
+          id: f.id,
+          name: f.razao_social,
+          score: 90,
+          lastQuote: "2026-06-18",
+          responseRate: 95
+        })))
+      })
+      .catch((err) => {
+        console.error("Erro ao carregar fornecedores:", err)
+        setSuppliers(mockSuppliers)
+      })
+
+    // Load products
+    produtoService.listarTodos()
+      .then((data) => {
+        setProducts(data || [])
+      })
+      .catch((err) => {
+        console.error("Erro ao carregar produtos:", err)
+      })
+
+    // Load RIs
+    requisicaoService.listarTodas()
+      .then((data: any[]) => {
+        // Show all RIs with PENDING, APPROVED, or FULFILLED status
+        setApprovedRIs(data.filter((r: any) => r.status === "APPROVED" || r.status === "PENDING" || r.status === "FULFILLED") || [])
+      })
+      .catch((err: any) => {
+        console.error("Erro ao carregar RIs:", err)
+        setApprovedRIs(mockApprovedRIs)
+      })
+  }, [])
+
+  const [items, setItems] = useState<RfqItem[]>([])
+
+  // Automatically load items when RI is selected
+  useEffect(() => {
+    if (!selectedRI || selectedRI === "") {
+      setItems([])
+      return
+    }
+
+    const foundRi = approvedRIs.find(r => r.id === selectedRI || r.codigo === selectedRI)
+    if (foundRi) {
+      // If we already have the items preloaded in list
+      if (foundRi.itens && foundRi.itens.length > 0) {
+        setItems(foundRi.itens.map((it: any) => ({
+          id: it.produto_id || it.id,
+          sku: it.produto?.sku || "PROD",
+          description: it.produto?.descricao || it.produto?.nome || "Item da RI",
+          quantity: it.quantidade,
+          unit: it.produto?.unidade_medida || "UN",
+          minValidity: it.validade_min_proposta ? `${it.validade_min_proposta}%` : "80%",
+          specifications: it.observacoes || "",
+          visibleToSupplier: true
+        })))
+      } else {
+        // Fetch full details
+        requisicaoService.buscarPorId(foundRi.id)
+          .then((data: any) => {
+            if (data?.itens) {
+              setItems(data.itens.map((it: any) => ({
+                id: it.produto_id || it.id,
+                sku: it.produto?.sku || "PROD",
+                description: it.produto?.descricao || it.produto?.nome || "Item da RI",
+                quantity: it.quantidade,
+                unit: it.produto?.unidade_medida || "UN",
+                minValidity: it.validade_min_proposta ? `${it.validade_min_proposta}%` : "80%",
+                specifications: it.observacoes || "",
+                visibleToSupplier: true
+              })))
+            }
+          })
+          .catch((err: any) => {
+            console.error("Erro ao buscar itens da RI:", err)
+          })
+      }
+    }
+  }, [selectedRI, approvedRIs])
 
   const [criteria, setCriteria] = useState({
     price: 40,
@@ -113,11 +187,71 @@ export function NewRfqContent() {
     })
   }
 
+  const handleAddExtraItem = () => {
+    const prod = products.find(p => p.id === selectedProductToAdd)
+    if (!prod) {
+      toast({
+        title: "Selecione um produto",
+        description: "Selecione um produto da lista.",
+        variant: "destructive"
+      })
+      return
+    }
+
+    const isDuplicate = items.some(it => it.id === prod.id)
+    if (isDuplicate) {
+      toast({
+        title: "Produto Duplicado",
+        description: "Este produto já está na lista de cotação.",
+        variant: "destructive"
+      })
+      return
+    }
+
+    const newItem: RfqItem = {
+      id: prod.id || Math.random().toString(),
+      sku: prod.sku,
+      description: prod.descricao || "Item Extra",
+      quantity: Number(quantityToAdd),
+      unit: prod.unidade_medida || "UN",
+      minValidity: "80%",
+      specifications: "",
+      visibleToSupplier: true
+    }
+
+    setItems(prev => [...prev, newItem])
+    setShowAddProductModal(false)
+    setSelectedProductToAdd("")
+    setQuantityToAdd(1)
+
+    toast({
+      title: "Item Adicionado",
+      description: `${prod.sku} foi adicionado à lista.`
+    })
+  }
+
+  const handleDeleteItem = (itemId: string) => {
+    setItems(prev => prev.filter(it => it.id !== itemId))
+    toast({
+      title: "Item Removido",
+      description: "O item foi removido da cotação."
+    })
+  }
+
   const handleSendToSuppliers = () => {
-    if (!selectedRI || !deadline || selectedSuppliers.length < 2) {
+    if (!selectedRI || !deadline || selectedSuppliers.length < 1) {
       toast({
         title: "Campos obrigatórios",
-        description: "Preencha todos os campos obrigatórios e selecione pelo menos 2 fornecedores.",
+        description: "Preencha todos os campos obrigatórios e selecione pelo menos 1 fornecedor.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (items.length === 0) {
+      toast({
+        title: "Lista Vazia",
+        description: "Por favor, adicione pelo menos 1 item na cotação.",
         variant: "destructive",
       })
       return
@@ -132,11 +266,30 @@ export function NewRfqContent() {
       return
     }
 
-    toast({
-      title: "RFQ enviada com sucesso!",
-      description: `A cotação foi enviada para ${selectedSuppliers.length} fornecedores.`,
+    const payloadItems = items.map((item) => ({
+      produtoId: item.id,
+      quantidade: Number(item.quantity)
+    }))
+
+    comprasService.createRFQ({
+      dataLimite: new Date(deadline).toISOString(),
+      items: payloadItems
     })
-    router.push("/compras/rfqs")
+    .then((res) => {
+      toast({
+        title: "RFQ enviada com sucesso!",
+        description: `A cotação foi gerada com o código ${res.codigo || res.id}.`,
+      })
+      router.push("/compras/rfqs")
+    })
+    .catch((err) => {
+      console.error(err)
+      toast({
+        title: "Erro ao criar RFQ",
+        description: err.response?.data?.error || "Ocorreu um erro ao registrar a cotação no servidor.",
+        variant: "destructive",
+      })
+    })
   }
 
   return (
@@ -194,10 +347,9 @@ export function NewRfqContent() {
                   <SelectValue placeholder="Selecione uma RI aprovada..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {mockApprovedRIs.map((ri) => (
+                  {approvedRIs.map((ri) => (
                     <SelectItem key={ri.id} value={ri.id}>
-                      {ri.id} | {ri.requester} | {new Date(ri.neededDate).toLocaleDateString("pt-BR")} | {ri.itemsCount}{" "}
-                      itens
+                      {ri.codigo} | {ri.solicitante_nome} | {ri.date_necessaria ? new Date(ri.date_necessaria).toLocaleDateString("pt-BR") : "-"}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -255,11 +407,11 @@ export function NewRfqContent() {
             <div className="text-center py-8 text-muted-foreground">
               <AlertCircle className="w-12 h-12 mx-auto mb-3 text-gray-300" />
               <p>Nenhum fornecedor selecionado</p>
-              <p className="text-sm">Selecione pelo menos 2 fornecedores *</p>
+              <p className="text-sm">Selecione pelo menos 1 fornecedor *</p>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-4">
-              {mockSuppliers
+              {suppliers
                 .filter((s) => selectedSuppliers.includes(s.id))
                 .map((supplier) => (
                   <div key={supplier.id} className="flex items-center justify-between p-4 border rounded-lg">
@@ -332,18 +484,39 @@ export function NewRfqContent() {
                       <div className="text-sm">{item.description}</div>
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <Input type="number" value={item.quantity} className="w-20 text-center" />
+                      <Input
+                        type="number"
+                        value={item.quantity}
+                        onChange={(e) => {
+                          const val = Number(e.target.value)
+                          setItems(prev => prev.map(it => it.id === item.id ? { ...it, quantity: val } : it))
+                        }}
+                        className="w-20 text-center"
+                      />
                     </td>
                     <td className="px-4 py-3 text-center text-sm">{item.unit}</td>
                     <td className="px-4 py-3 text-center text-sm">{item.minValidity}</td>
                     <td className="px-4 py-3">
-                      <Input placeholder="Requisitos específicos..." value={item.specifications} className="text-sm" />
+                      <Input
+                        placeholder="Requisitos específicos..."
+                        value={item.specifications}
+                        onChange={(e) => {
+                          const val = e.target.value
+                          setItems(prev => prev.map(it => it.id === item.id ? { ...it, specifications: val } : it))
+                        }}
+                        className="text-sm"
+                      />
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <Checkbox checked={item.visibleToSupplier} />
+                      <Checkbox
+                        checked={item.visibleToSupplier}
+                        onCheckedChange={(checked) => {
+                          setItems(prev => prev.map(it => it.id === item.id ? { ...it, visibleToSupplier: !!checked } : it))
+                        }}
+                      />
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <Button variant="ghost" size="sm">
+                      <Button variant="ghost" size="sm" onClick={() => handleDeleteItem(item.id)}>
                         <Trash2 className="w-4 h-4 text-red-600" />
                       </Button>
                     </td>
@@ -352,7 +525,12 @@ export function NewRfqContent() {
               </tbody>
             </table>
           </div>
-          <Button variant="outline" size="sm" className="mt-4 bg-transparent">
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-4 bg-transparent"
+            onClick={() => setShowAddProductModal(true)}
+          >
             <Plus className="w-4 h-4 mr-2" />
             Adicionar Item Extra
           </Button>
@@ -450,7 +628,7 @@ export function NewRfqContent() {
             <DialogDescription>Selecione pelo menos 2 fornecedores para enviar a cotação.</DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-2 max-h-[400px] overflow-y-auto">
-            {mockSuppliers.map((supplier) => (
+            {suppliers.map((supplier) => (
               <div
                 key={supplier.id}
                 className={`flex items-center justify-between p-4 border rounded-lg cursor-pointer hover:bg-gray-50 ${
@@ -485,6 +663,53 @@ export function NewRfqContent() {
             </Button>
             <Button onClick={() => setShowSupplierModal(false)} className="bg-imperial hover:bg-imperial">
               Confirmar Seleção ({selectedSuppliers.length})
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Extra Item Dialog */}
+      <Dialog open={showAddProductModal} onOpenChange={setShowAddProductModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Adicionar Item Extra</DialogTitle>
+            <DialogDescription>
+              Selecione um produto cadastrado e defina a quantidade para cotação.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="product-select">Produto *</Label>
+              <Select value={selectedProductToAdd} onValueChange={setSelectedProductToAdd}>
+                <SelectTrigger id="product-select">
+                  <SelectValue placeholder="Selecione um produto..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {products.map((prod) => (
+                    <SelectItem key={prod.id} value={prod.id}>
+                      {prod.sku} - {prod.descricao}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="product-qty">Quantidade *</Label>
+              <Input
+                id="product-qty"
+                type="number"
+                min={1}
+                value={quantityToAdd}
+                onChange={(e) => setQuantityToAdd(Number(e.target.value))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddProductModal(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleAddExtraItem} className="bg-imperial hover:bg-imperial">
+              Adicionar Item
             </Button>
           </DialogFooter>
         </DialogContent>

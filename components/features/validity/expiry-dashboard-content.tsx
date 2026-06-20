@@ -184,7 +184,8 @@ export function ExpiryDashboardContent() {
 
   // Format Helpers
   const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val)
+    const formattedVal = new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val)
+    return `${formattedVal} MT`
   }
 
   const uniqueCategories = Array.from(new Set(items.map(item => item.produto.categoria).filter(Boolean)))

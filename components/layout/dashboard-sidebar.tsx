@@ -46,7 +46,9 @@ export function DashboardSidebar({ isCollapsed, userProfile }: DashboardSidebarP
   }, [])
 
   // Get menu items based on profile
-  const menuItems = getSidebarConfig(perfilAtivo).items
+  const menuItems = getSidebarConfig(perfilAtivo).items.filter(
+    (item) => item.label !== "Expedição" && item.label !== "Admin"
+  )
 
   const toggleExpanded = (label: string) => {
     setExpandedItems((prev) => (prev.includes(label) ? prev.filter((item) => item !== label) : [...prev, label]))

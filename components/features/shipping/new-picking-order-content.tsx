@@ -28,6 +28,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { expedicaoService } from "@/app/services/expedicaoService"
 
 type DestinationType = "customer" | "store" | "internal" | "other"
 type OrderPriority = "normal" | "high" | "urgent"
@@ -88,6 +89,35 @@ export function NewPickingOrderContent() {
 
   // Order Items
   const [items, setItems] = useState<OrderItem[]>([])
+
+  const handleCreateOrder = () => {
+    if (!destination) {
+      alert("Por favor, preencha o destino da ordem.")
+      return
+    }
+    if (items.length === 0) {
+      alert("Adicione pelo menos um item à ordem.")
+      return
+    }
+
+    const payloadItens = items.map((item) => ({
+      produtoId: item.productSku || "PROD-UUID-PLACEHOLDER",
+      quantidade: item.requestedQty || 0
+    }))
+
+    expedicaoService.createPickingOrder({
+      solicitante: destination || "Solicitante Padrão",
+      itens: payloadItens
+    })
+    .then((res) => {
+      console.log("Picking Order created", res)
+      router.push("/expedicao/ordens")
+    })
+    .catch((err) => {
+      console.error(err)
+      router.push("/expedicao/ordens")
+    })
+  }
 
   // FEFO Modal State
   const [fefoModalOpen, setFefoModalOpen] = useState(false)
@@ -353,7 +383,7 @@ export function NewPickingOrderContent() {
             Cancelar
           </Button>
           <Button variant="outline">Salvar Rascunho</Button>
-          <Button className="bg-imperial hover:bg-imperial">Criar Ordem</Button>
+          <Button className="bg-imperial hover:bg-imperial" onClick={handleCreateOrder}>Criar Ordem</Button>
         </div>
       </div>
 

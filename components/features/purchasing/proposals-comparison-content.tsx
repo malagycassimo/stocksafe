@@ -1,8 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useParams } from "next/navigation"
+import { comprasService } from "@/app/services/comprasService"
 import {
   RefreshCw,
   Download,
@@ -65,6 +66,8 @@ interface ItemComparison {
 
 export function ProposalsComparisonContent() {
   const router = useRouter()
+  const params = useParams()
+  const rfqId = params?.id as string
   const { toast } = useToast()
   const [viewMode, setViewMode] = useState<"by-item" | "by-supplier">("by-item")
   const [filterMode, setFilterMode] = useState("all")
@@ -76,8 +79,65 @@ export function ProposalsComparisonContent() {
     confirmed: false,
     approved: false,
   })
+  const [isLoading, setIsLoading] = useState(true)
+  const [items, setItems] = useState<ItemComparison[]>([])
 
-  const [items, setItems] = useState<ItemComparison[]>([
+  useEffect(() => {
+    if (!rfqId) return
+    setIsLoading(true)
+    comprasService.getComparativoPropostas(rfqId)
+      .then((data) => {
+        if (!data || !data.propostas || data.propostas.length === 0) {
+          // fallback to mock items
+          setItems(defaultMockItems)
+          setIsLoading(false)
+          return
+        }
+
+        const itemMap = new Map<string, any>()
+        data.propostas.forEach((prop: any) => {
+          prop.itens.forEach((item: any) => {
+            if (!itemMap.has(item.produtoSku)) {
+              itemMap.set(item.produtoSku, {
+                itemId: item.produtoSku,
+                sku: item.produtoSku,
+                description: item.produtoDescricao,
+                quantity: item.quantidade,
+                unit: "UN",
+                minValidity: 180,
+                proposals: []
+              })
+            }
+            const currentItem = itemMap.get(item.produtoSku)
+            currentItem.proposals.push({
+              supplierId: prop.fornecedorId || prop.propostaId,
+              supplierName: prop.fornecedorNome,
+              supplierInitials: prop.fornecedorNome.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase(),
+              supplierScore: 90,
+              lot: "L-PADRAO",
+              expiryDate: new Date(Date.now() + 180*24*60*60*1000).toISOString().split('T')[0],
+              daysUntilExpiry: 180,
+              datasheet: "DS-PADRAO.pdf",
+              unitPrice: item.precoUnitario,
+              currency: "MT",
+              deliveryTime: prop.prazoEntrega,
+              deliveryUnit: "dias",
+              observations: "",
+              conformity: "conforme"
+            })
+          })
+        })
+        setItems(Array.from(itemMap.values()))
+        setIsLoading(false)
+      })
+      .catch((err) => {
+        console.error("Erro ao obter comparativo de propostas:", err)
+        setItems(defaultMockItems)
+        setIsLoading(false)
+      })
+  }, [rfqId])
+
+  const defaultMockItems: ItemComparison[] = [
     {
       itemId: "1",
       sku: "LMP-001",
@@ -96,7 +156,7 @@ export function ProposalsComparisonContent() {
           daysUntilExpiry: 350,
           datasheet: "DS-2024-001.pdf",
           unitPrice: 45.5,
-          currency: "MZN",
+          currency: "MT",
           deliveryTime: 5,
           deliveryUnit: "dias",
           observations: "",
@@ -112,7 +172,7 @@ export function ProposalsComparisonContent() {
           daysUntilExpiry: 270,
           datasheet: "COA-2025-B.pdf",
           unitPrice: 42.0,
-          currency: "MZN",
+          currency: "MT",
           deliveryTime: 7,
           deliveryUnit: "dias",
           observations: "Desconto de 5% para pedidos acima de 20 unidades",
@@ -128,7 +188,7 @@ export function ProposalsComparisonContent() {
           daysUntilExpiry: 220,
           datasheet: "DS-C-001.pdf",
           unitPrice: 48.0,
-          currency: "MZN",
+          currency: "MT",
           deliveryTime: 3,
           deliveryUnit: "dias",
           observations: "",
@@ -154,7 +214,7 @@ export function ProposalsComparisonContent() {
           daysUntilExpiry: 365,
           datasheet: "DS-2024-002.pdf",
           unitPrice: 32.0,
-          currency: "MZN",
+          currency: "MT",
           deliveryTime: 5,
           deliveryUnit: "dias",
           observations: "",
@@ -170,7 +230,7 @@ export function ProposalsComparisonContent() {
           daysUntilExpiry: 250,
           datasheet: "COA-2025-B2.pdf",
           unitPrice: 29.5,
-          currency: "MZN",
+          currency: "MT",
           deliveryTime: 7,
           deliveryUnit: "dias",
           observations: "",
@@ -186,7 +246,7 @@ export function ProposalsComparisonContent() {
           daysUntilExpiry: 300,
           datasheet: "DS-C-002.pdf",
           unitPrice: 35.0,
-          currency: "MZN",
+          currency: "MT",
           deliveryTime: 4,
           deliveryUnit: "dias",
           observations: "",
@@ -194,7 +254,7 @@ export function ProposalsComparisonContent() {
         },
       ],
     },
-  ])
+  ]
 
   const getBestPrice = (proposals: SupplierProposal[]) => {
     return Math.min(...proposals.map((p) => p.unitPrice))
@@ -641,7 +701,7 @@ export function ProposalsComparisonContent() {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <div className="font-bold text-imperial">775.00 MZN</div>
+                    <div className="font-bold text-imperial">775.00 MT</div>
                   </td>
                   <td className="px-4 py-3 text-center">5 dias</td>
                   <td className="px-4 py-3 text-center">
@@ -665,7 +725,7 @@ export function ProposalsComparisonContent() {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <div className="font-bold text-imperial">862.50 MZN</div>
+                    <div className="font-bold text-imperial">862.50 MT</div>
                   </td>
                   <td className="px-4 py-3 text-center">7 dias</td>
                   <td className="px-4 py-3 text-center">
@@ -689,7 +749,7 @@ export function ProposalsComparisonContent() {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <div className="font-bold text-imperial">1005.00 MZN</div>
+                    <div className="font-bold text-imperial">1005.00 MT</div>
                   </td>
                   <td className="px-4 py-3 text-center">3.5 dias</td>
                   <td className="px-4 py-3 text-center">

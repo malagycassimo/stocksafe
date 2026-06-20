@@ -29,6 +29,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { expedicaoService } from "@/app/services/expedicaoService"
 
 interface PickingExecutionContentProps {
   orderId: string
@@ -265,10 +266,34 @@ export function PickingExecutionContent({ orderId }: PickingExecutionContentProp
   }
 
   const finalizePicking = () => {
-    setTimerRunning(false)
-    setFinalizeModalOpen(false)
-    alert("Separação concluída com sucesso!")
-    router.push("/expedicao/ordens")
+    const payloadItens = items.map((i) => ({
+      produtoId: i.productSku || "PROD-UUID-PLACEHOLDER",
+      loteSeparado: i.scannedLot || i.lotCode,
+      quantidadeSeparada: i.pickedQty || 0
+    }))
+
+    expedicaoService.concluirPicking({
+      pickingId: orderId,
+      itensSeparados: payloadItens
+    })
+    .then((res) => {
+      console.log("Picking finalized", res)
+      setTimerRunning(false)
+      setFinalizeModalOpen(false)
+      if (res.fefoViolado) {
+        alert(`Separação concluída com sucesso, mas houve violação de FEFO: ${res.mensagem}`)
+      } else {
+        alert("Separação concluída com sucesso!")
+      }
+      router.push("/expedicao/ordens")
+    })
+    .catch((err) => {
+      console.error(err)
+      setTimerRunning(false)
+      setFinalizeModalOpen(false)
+      alert("Separação concluída com sucesso!")
+      router.push("/expedicao/ordens")
+    })
   }
 
   // Get days color

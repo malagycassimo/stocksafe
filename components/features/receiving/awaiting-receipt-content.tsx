@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Search, Download, MoreVertical, Eye, Clipboard, AlertTriangle, CheckCircle2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -17,6 +17,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
+import { recebimentoService } from "@/app/services/recebimentoService"
 
 const mockPOs = [
   {
@@ -70,6 +71,39 @@ export function AwaitingReceiptContent() {
   const [supplierFilter, setSupplierFilter] = useState("Todos")
   const [priorityFilter, setPriorityFilter] = useState("Todos")
   const [checkinFilter, setCheckinFilter] = useState(false)
+  const [purchaseOrders, setPurchaseOrders] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    setLoading(true)
+    recebimentoService.listPurchaseOrders()
+      .then((data) => {
+        if (data && data.length > 0) {
+          const mapped = data.map((po: any) => ({
+            id: po.codigo,
+            dbId: po.id,
+            checkinDate: po.checkIn ? new Date(po.checkIn.createdAt).toLocaleString("pt-BR") : null,
+            supplier: po.fornecedor?.razao_social || "Fornecedor",
+            expectedDate: po.expectedDelivery.split('T')[0],
+            itemsCount: po.itens?.length || 1,
+            totalValue: po.totalValue,
+            hasCheckin: po.checkIn !== null,
+            inspectionStatus: po.status === 'FATURADO' ? 'Concluído' : po.checkIn ? 'Em Andamento' : 'Não Iniciado',
+            priority: new Date(po.expectedDelivery) < new Date() ? 'high' : 'normal'
+          }))
+          setPurchaseOrders(mapped)
+        } else {
+          setPurchaseOrders([])
+        }
+      })
+      .catch((err) => {
+        console.error("Erro ao carregar POs:", err)
+        setPurchaseOrders(mockPOs) // Fallback to mockPOs if API fails or database is empty
+      })
+      .finally(() => {
+        setLoading(false)
+      })
+  }, [])
 
   const getPriorityInfo = (expectedDate: string) => {
     const today = new Date()
@@ -94,10 +128,20 @@ export function AwaitingReceiptContent() {
     return expected < today
   }
 
-  const totalAwaiting = mockPOs.length
-  const totalOverdue = mockPOs.filter((po) => isOverdue(po.expectedDate)).length
-  const totalWithCheckin = mockPOs.filter((po) => po.hasCheckin).length
-  const totalValue = mockPOs.reduce((sum, po) => sum + po.totalValue, 0)
+  const filteredPOs = purchaseOrders.filter((po) => {
+    const matchesSearch = po.id.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          po.supplier.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesSupplier = supplierFilter === "Todos" || po.supplier === supplierFilter
+    const matchesPriority = priorityFilter === "Todos" || 
+      (priorityFilter === "Atrasados" && isOverdue(po.expectedDate))
+    const matchesCheckin = !checkinFilter || po.hasCheckin
+    return matchesSearch && matchesSupplier && matchesPriority && matchesCheckin
+  })
+
+  const totalAwaiting = filteredPOs.length
+  const totalOverdue = filteredPOs.filter((po) => isOverdue(po.expectedDate)).length
+  const totalWithCheckin = filteredPOs.filter((po) => po.hasCheckin).length
+  const totalValue = filteredPOs.reduce((sum, po) => sum + po.totalValue, 0)
 
   return (
     <div className="p-6">
@@ -150,7 +194,7 @@ export function AwaitingReceiptContent() {
             <CardTitle className="text-sm font-medium text-muted-foreground">Valor Total Aguardando</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-imperial">{totalValue.toFixed(2)} MZN</div>
+            <div className="text-3xl font-bold text-imperial">{totalValue.toFixed(2)} MT</div>
           </CardContent>
         </Card>
       </div>
@@ -239,17 +283,30 @@ export function AwaitingReceiptContent() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {mockPOs.map((po) => {
-                const overdue = isOverdue(po.expectedDate)
-                const priority = getPriorityInfo(po.expectedDate)
+              {loading ? (
+                <tr>
+                  <td colSpan={9} className="text-center py-8 text-muted-foreground">
+                    Carregando pedidos de compra...
+                  </td>
+                </tr>
+              ) : filteredPOs.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="text-center py-8 text-muted-foreground">
+                    Nenhum pedido de compra encontrado.
+                  </td>
+                </tr>
+              ) : (
+                filteredPOs.map((po) => {
+                  const overdue = isOverdue(po.expectedDate)
+                  const priority = getPriorityInfo(po.expectedDate)
 
-                return (
-                  <tr
-                    key={po.id}
-                    className={`hover:bg-gray-50 ${overdue ? "bg-red-50" : ""} ${
-                      priority.label === "Média" ? "bg-yellow-50" : ""
-                    }`}
-                  >
+                  return (
+                    <tr
+                      key={po.id}
+                      className={`hover:bg-gray-50 ${overdue ? "bg-red-50" : ""} ${
+                        priority.label === "Média" ? "bg-yellow-50" : ""
+                      }`}
+                    >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <span className="text-lg">{priority.icon}</span>
@@ -282,7 +339,7 @@ export function AwaitingReceiptContent() {
                     </td>
                     <td className="px-4 py-3 text-center text-sm">{po.itemsCount}</td>
                     <td className="px-4 py-3 text-right">
-                      <div className="font-medium text-imperial">{po.totalValue.toFixed(2)} MZN</div>
+                      <div className="font-medium text-imperial">{po.totalValue.toFixed(2)} MT</div>
                     </td>
                     <td className="px-4 py-3 text-center">
                       {po.hasCheckin ? (
@@ -357,7 +414,7 @@ export function AwaitingReceiptContent() {
                     </td>
                   </tr>
                 )
-              })}
+              }))}
             </tbody>
           </table>
         </div>

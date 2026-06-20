@@ -35,14 +35,14 @@ const mockHistory = [
     date: "2025-01-13",
     items: 3,
     status: "Aprovada",
-    value: "R$ 2.450,00",
+    value: "2.450,00 MT",
   },
   {
     id: "RFQ-2024-125",
     date: "2024-12-28",
     items: 8,
     status: "Rejeitada",
-    value: "R$ 5.200,00",
+    value: "5.200,00 MT",
   },
 ]
 

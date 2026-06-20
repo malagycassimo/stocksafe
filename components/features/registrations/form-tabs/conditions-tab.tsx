@@ -97,7 +97,7 @@ export function ConditionsTab({ formData, updateFormData, errors }: ConditionsTa
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="MZN">MZN - Metical</SelectItem>
+                  <SelectItem value="MT">MT - Metical</SelectItem>
                   <SelectItem value="USD">USD - Dólar</SelectItem>
                   <SelectItem value="EUR">EUR - Euro</SelectItem>
                   <SelectItem value="ZAR">ZAR - Rand</SelectItem>

@@ -369,7 +369,7 @@ export function AuditTrailContent() {
                     </div>
                   </td>
                   <td className="p-2">
-                    <p className="truncate max-w-xs">Atualizou PO #789: valor de R$ 1.000 para R$ 1.200</p>
+                    <p className="truncate max-w-xs">Atualizou PO #789: valor de 1.000 MT para 1.200 MT</p>
                   </td>
                   <td className="p-2">
                     <p className="font-mono text-xs">192.168.1.52</p>
