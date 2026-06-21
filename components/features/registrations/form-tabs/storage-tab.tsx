@@ -142,6 +142,16 @@ export function StorageTab({ formData, updateFormData, errors }: StorageTabProps
               ))}
             </div>
           </div>
+
+          <div className="space-y-2 pt-2">
+            <Label htmlFor="customRestrictions">Restrições Específicas de Armazenagem</Label>
+            <Input
+              id="customRestrictions"
+              value={formData.storageType.customRestrictions || ""}
+              onChange={(e) => handleStorageTypeChange("customRestrictions", e.target.value)}
+              placeholder="Ex: Não empilhar perto de produtos químicos odoríferos"
+            />
+          </div>
         </CardContent>
       </Card>
 

@@ -43,6 +43,7 @@ export interface PurchaseOrderInput {
   propostaId?: string;
   totalValue: number;
   expectedDelivery: string;
+  itens?: { produtoId: string; quantidade: number; precoUnitario: number }[];
 }
 
 export interface PurchaseOrderData {

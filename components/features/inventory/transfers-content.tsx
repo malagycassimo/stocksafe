@@ -98,6 +98,7 @@ export function TransfersContent() {
   const [locais, setLocais] = useState<any[]>([])
   const [lotesDisponiveis, setLotesDisponiveis] = useState<any[]>([])
   const [transfers, setTransfers] = useState<any[]>([])
+  const [loadingLotes, setLoadingLotes] = useState(false)
 
   // New transfer form state
   const [selectedProduct, setSelectedProduct] = useState("")
@@ -171,17 +172,34 @@ export function TransfersContent() {
         return
       }
       try {
+        setLoadingLotes(true)
         const prod = products.find((p) => p.id === selectedProduct)
         if (prod) {
           const list = await estoqueService.listar({ search: prod.sku })
-          setLotesDisponiveis(list)
+          // Apenas lotes com quantidade > 0 e que tenham código de lote válido
+          const validList = list.filter((l) => l.quantidade > 0 && l.lote)
+          setLotesDisponiveis(validList)
+          if (validList.length === 0) {
+            toast({
+              title: "Sem lotes disponíveis",
+              description: "Este produto não possui lotes com saldo ativo no estoque no momento.",
+              variant: "destructive"
+            })
+          }
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error("Erro ao carregar lotes do produto:", err)
+        toast({
+          title: "Erro ao carregar lotes",
+          description: err.message || "Erro desconhecido ao carregar os lotes.",
+          variant: "destructive"
+        })
+      } finally {
+        setLoadingLotes(false)
       }
     }
     carregarLotesDoProduto()
-  }, [selectedProduct, products])
+  }, [selectedProduct, products, toast])
 
   // Filter transfers
   const filteredTransfers = useMemo(() => {
@@ -836,9 +854,18 @@ export function TransfersContent() {
                       setOriginLocation(lotItem.local_id)
                     }
                   }}
+                  disabled={loadingLotes || !selectedProduct || lotesDisponiveis.length === 0}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder={selectedProduct ? "Selecionar lote disponível" : "Selecione primeiro um produto"} />
+                    <SelectValue placeholder={
+                      loadingLotes 
+                        ? "Carregando lotes..." 
+                        : selectedProduct 
+                          ? lotesDisponiveis.length === 0 
+                            ? "Nenhum lote disponível" 
+                            : "Selecionar lote disponível" 
+                          : "Selecione primeiro um produto"
+                    } />
                   </SelectTrigger>
                   <SelectContent>
                     {lotesDisponiveis.map((lotItem) => (
@@ -853,6 +880,15 @@ export function TransfersContent() {
                     ))}
                   </SelectContent>
                 </Select>
+                {selectedProduct && !loadingLotes && lotesDisponiveis.length === 0 && (
+                  <div className="mt-2 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-3 text-sm flex items-start gap-2">
+                    <AlertCircle className="w-5.5 h-5.5 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-semibold block">Nenhum lote disponível:</span>
+                      Este produto está cadastrado no sistema, mas não possui saldo ativo em estoque no momento para transferência.
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>

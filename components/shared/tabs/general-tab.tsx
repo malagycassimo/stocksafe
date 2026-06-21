@@ -69,6 +69,7 @@ export function GeneralTab({ formData, updateFormData, errors }: GeneralTabProps
               <SelectItem value="Fresco">Fresco</SelectItem>
               <SelectItem value="Seco">Seco</SelectItem>
               <SelectItem value="Congelado">Congelado</SelectItem>
+              <SelectItem value="Laticínios">Laticínios</SelectItem>
               <SelectItem value="Bebidas">Bebidas</SelectItem>
               <SelectItem value="Limpeza">Limpeza</SelectItem>
               <SelectItem value="Higiene">Higiene</SelectItem>

@@ -34,10 +34,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Legend, ResponsiveContainer } from "recharts"
 
 interface SupplierProposal {
   supplierId: string
+  proposalId: string
   supplierName: string
   supplierInitials: string
   supplierScore: number
@@ -81,15 +81,21 @@ export function ProposalsComparisonContent() {
   })
   const [isLoading, setIsLoading] = useState(true)
   const [items, setItems] = useState<ItemComparison[]>([])
+  const [rfqDetails, setRfqDetails] = useState<any>(null)
 
-  useEffect(() => {
+  const loadComparativo = () => {
     if (!rfqId) return
     setIsLoading(true)
+    
+    // Fetch RFQ details for general info
+    comprasService.obterRFQ(rfqId)
+      .then(setRfqDetails)
+      .catch(err => console.error("Erro ao obter detalhes da RFQ:", err))
+
     comprasService.getComparativoPropostas(rfqId)
       .then((data) => {
         if (!data || !data.propostas || data.propostas.length === 0) {
-          // fallback to mock items
-          setItems(defaultMockItems)
+          setItems([])
           setIsLoading(false)
           return
         }
@@ -111,6 +117,7 @@ export function ProposalsComparisonContent() {
             const currentItem = itemMap.get(item.produtoSku)
             currentItem.proposals.push({
               supplierId: prop.fornecedorId || prop.propostaId,
+              proposalId: prop.propostaId,
               supplierName: prop.fornecedorNome,
               supplierInitials: prop.fornecedorNome.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase(),
               supplierScore: 90,
@@ -132,129 +139,14 @@ export function ProposalsComparisonContent() {
       })
       .catch((err) => {
         console.error("Erro ao obter comparativo de propostas:", err)
-        setItems(defaultMockItems)
+        setItems([])
         setIsLoading(false)
       })
-  }, [rfqId])
+  }
 
-  const defaultMockItems: ItemComparison[] = [
-    {
-      itemId: "1",
-      sku: "LMP-001",
-      description: "Detergente Neutro - 5L",
-      quantity: 10,
-      unit: "UN",
-      minValidity: 180,
-      proposals: [
-        {
-          supplierId: "1",
-          supplierName: "Fornecedor A",
-          supplierInitials: "FA",
-          supplierScore: 92,
-          lot: "L2025-001",
-          expiryDate: "2025-12-31",
-          daysUntilExpiry: 350,
-          datasheet: "DS-2024-001.pdf",
-          unitPrice: 45.5,
-          currency: "MT",
-          deliveryTime: 5,
-          deliveryUnit: "dias",
-          observations: "",
-          conformity: "conforme",
-        },
-        {
-          supplierId: "2",
-          supplierName: "Fornecedor B",
-          supplierInitials: "FB",
-          supplierScore: 88,
-          lot: "B-2025-100",
-          expiryDate: "2025-10-15",
-          daysUntilExpiry: 270,
-          datasheet: "COA-2025-B.pdf",
-          unitPrice: 42.0,
-          currency: "MT",
-          deliveryTime: 7,
-          deliveryUnit: "dias",
-          observations: "Desconto de 5% para pedidos acima de 20 unidades",
-          conformity: "conforme",
-        },
-        {
-          supplierId: "3",
-          supplierName: "Fornecedor C",
-          supplierInitials: "FC",
-          supplierScore: 85,
-          lot: "C-001-2025",
-          expiryDate: "2025-08-20",
-          daysUntilExpiry: 220,
-          datasheet: "DS-C-001.pdf",
-          unitPrice: 48.0,
-          currency: "MT",
-          deliveryTime: 3,
-          deliveryUnit: "dias",
-          observations: "",
-          conformity: "conforme",
-        },
-      ],
-    },
-    {
-      itemId: "2",
-      sku: "LMP-015",
-      description: "Desinfetante Multiuso - 2L",
-      quantity: 15,
-      unit: "UN",
-      minValidity: 270,
-      proposals: [
-        {
-          supplierId: "1",
-          supplierName: "Fornecedor A",
-          supplierInitials: "FA",
-          supplierScore: 92,
-          lot: "L2025-002",
-          expiryDate: "2026-01-15",
-          daysUntilExpiry: 365,
-          datasheet: "DS-2024-002.pdf",
-          unitPrice: 32.0,
-          currency: "MT",
-          deliveryTime: 5,
-          deliveryUnit: "dias",
-          observations: "",
-          conformity: "conforme",
-        },
-        {
-          supplierId: "2",
-          supplierName: "Fornecedor B",
-          supplierInitials: "FB",
-          supplierScore: 88,
-          lot: "B-2025-101",
-          expiryDate: "2025-09-30",
-          daysUntilExpiry: 250,
-          datasheet: "COA-2025-B2.pdf",
-          unitPrice: 29.5,
-          currency: "MT",
-          deliveryTime: 7,
-          deliveryUnit: "dias",
-          observations: "",
-          conformity: "parcial",
-        },
-        {
-          supplierId: "3",
-          supplierName: "Fornecedor C",
-          supplierInitials: "FC",
-          supplierScore: 85,
-          lot: "C-002-2025",
-          expiryDate: "2025-11-10",
-          daysUntilExpiry: 300,
-          datasheet: "DS-C-002.pdf",
-          unitPrice: 35.0,
-          currency: "MT",
-          deliveryTime: 4,
-          deliveryUnit: "dias",
-          observations: "",
-          conformity: "conforme",
-        },
-      ],
-    },
-  ]
+  useEffect(() => {
+    loadComparativo()
+  }, [rfqId])
 
   const getBestPrice = (proposals: SupplierProposal[]) => {
     return Math.min(...proposals.map((p) => p.unitPrice))
@@ -306,10 +198,10 @@ export function ProposalsComparisonContent() {
       return
     }
 
-    if (!justification || !confirmations.analyzed || !confirmations.confirmed || !confirmations.approved) {
+    if (!justification || !confirmations.analyzed || !confirmations.confirmed) {
       toast({
         title: "Confirmação incompleta",
-        description: "Preencha a justificativa e marque todas as confirmações.",
+        description: "Preencha a justificativa e marque todas as confirmações obrigatórias.",
         variant: "destructive",
       })
       return
@@ -318,21 +210,53 @@ export function ProposalsComparisonContent() {
     setShowSelectionModal(true)
   }
 
-  const confirmGeneratePO = () => {
-    toast({
-      title: "PO(s) gerado(s) com sucesso!",
-      description: "Os fornecedores selecionados foram notificados.",
-    })
-    router.push("/compras/pos")
+  const confirmGeneratePO = async () => {
+    try {
+      const selectedSuppliers = Array.from(new Set(items.map(item => item.selectedSupplier).filter(Boolean)));
+      
+      for (const supplierId of selectedSuppliers) {
+        const firstItem = items.find(item => item.selectedSupplier === supplierId);
+        const proposal = firstItem?.proposals.find(p => p.supplierId === supplierId);
+        if (!proposal) continue;
+
+        const proposalId = proposal.proposalId;
+
+        const supplierItems = items.filter(item => item.selectedSupplier === supplierId);
+        const totalVal = supplierItems.reduce((sum, item) => {
+          const itemProp = item.proposals.find(p => p.supplierId === supplierId);
+          return sum + (itemProp?.unitPrice || 0) * item.quantity;
+        }, 0);
+
+        const year = new Date().getFullYear();
+        const rand = Math.floor(100 + Math.random() * 900);
+        const poCode = `PO-${year}-${rand}`;
+
+        await comprasService.createPO({
+          codigo: poCode,
+          fornecedorId: supplierId!,
+          propostaId: proposalId,
+          totalValue: totalVal,
+          expectedDelivery: new Date(Date.now() + (proposal.deliveryTime || 5) * 24 * 60 * 60 * 1000).toISOString()
+        });
+      }
+
+      toast({
+        title: "PO(s) gerado(s) com sucesso!",
+        description: "Os fornecedores selecionados foram notificados.",
+      })
+      router.push("/compras/pos")
+    } catch (err: any) {
+      console.error("Erro ao gerar PO:", err);
+      toast({
+        title: "Erro ao gerar PO",
+        description: err.response?.data?.error || "Não foi possível gerar a ordem de compra.",
+        variant: "destructive"
+      });
+    }
   }
 
-  const radarData = [
-    { subject: "Preço", A: 85, B: 95, C: 75 },
-    { subject: "Prazo", A: 90, B: 80, C: 95 },
-    { subject: "Qualidade", A: 92, B: 88, C: 85 },
-    { subject: "Score", A: 92, B: 88, C: 85 },
-    { subject: "Conformidade", A: 100, B: 90, C: 100 },
-  ]
+  // Get unique list of responding suppliers
+  const allSuppliers = items.length > 0 ? items[0].proposals : []
 
   return (
     <div className="p-6">
@@ -350,22 +274,18 @@ export function ProposalsComparisonContent() {
           RFQs
         </Link>
         {" / "}
-        <Link href="/compras/rfqs/RFQ-2025-001" className="hover:text-imperial">
-          RFQ #RFQ-2025-001
-        </Link>
-        {" / "}
         <span className="text-foreground">Comparativo</span>
       </div>
 
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-imperial">Comparativo de Propostas - RFQ #RFQ-2025-001</h1>
-          <Badge className="mt-2 bg-twilight text-imperial">3 de 3 fornecedores responderam</Badge>
+          <h1 className="text-3xl font-bold text-imperial">Comparativo de Propostas - RFQ #{rfqDetails?.codigo || rfqId}</h1>
+          <Badge className="mt-2 bg-twilight text-imperial">{allSuppliers.length} fornecedor(es) responderam</Badge>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline">
-            <RefreshCw className="w-4 h-4 mr-2" />
+          <Button variant="outline" onClick={loadComparativo}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
             Atualizar
           </Button>
           <Button variant="outline">
@@ -392,21 +312,19 @@ export function ProposalsComparisonContent() {
           <div className="grid grid-cols-4 gap-4">
             <div>
               <Label className="text-muted-foreground">Nº RFQ</Label>
-              <div className="font-mono font-medium">RFQ-2025-001</div>
-            </div>
-            <div>
-              <Label className="text-muted-foreground">RI Origem</Label>
-              <Link href="/requisicoes/RI-2025-003" className="font-mono text-blue-600 hover:underline">
-                RI-2025-003
-              </Link>
+              <div className="font-mono font-medium">{rfqDetails?.codigo || rfqId}</div>
             </div>
             <div>
               <Label className="text-muted-foreground">Prazo de Resposta</Label>
-              <div className="text-imperial font-medium">Encerrado</div>
+              <div className="text-imperial font-medium">{rfqDetails ? new Date(rfqDetails.dataLimite).toLocaleString("pt-BR") : "Carregando..."}</div>
+            </div>
+            <div>
+              <Label className="text-muted-foreground">Data de Criação</Label>
+              <div className="font-medium">{rfqDetails ? new Date(rfqDetails.createdAt).toLocaleDateString("pt-BR") : "Carregando..."}</div>
             </div>
             <div>
               <Label className="text-muted-foreground">Fornecedores</Label>
-              <div className="font-medium">3 convidados / 3 responderam</div>
+              <div className="font-medium">{allSuppliers.length} responderam</div>
             </div>
           </div>
         </CardContent>
@@ -434,7 +352,6 @@ export function ProposalsComparisonContent() {
                 <SelectContent>
                   <SelectItem value="all">Todas</SelectItem>
                   <SelectItem value="conforme">Propostas Conformes</SelectItem>
-                  <SelectItem value="desvio">Propostas com Desvio</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -453,7 +370,7 @@ export function ProposalsComparisonContent() {
       </Card>
 
       {/* Comparison by Item */}
-      {viewMode === "by-item" && (
+      {viewMode === "by-item" && items.length > 0 && (
         <div className="space-y-6">
           {items.map((item) => {
             const bestPrice = getBestPrice(item.proposals)
@@ -585,9 +502,6 @@ export function ProposalsComparisonContent() {
                                   Mais Rápido
                                 </Badge>
                               )}
-                              <div className="mt-1">
-                                <CheckCircle className="w-4 h-4 text-imperial inline" />
-                              </div>
                             </td>
                           ))}
                         </tr>
@@ -600,16 +514,6 @@ export function ProposalsComparisonContent() {
                             </td>
                           ))}
                         </tr>
-                        {item.proposals.some((p) => p.observations) && (
-                          <tr>
-                            <td className="px-4 py-3 font-medium">Observações</td>
-                            {item.proposals.map((proposal) => (
-                              <td key={proposal.supplierId} className="px-4 py-3 text-center">
-                                <div className="text-xs text-muted-foreground">{proposal.observations || "-"}</div>
-                              </td>
-                            ))}
-                          </tr>
-                        )}
                         <tr className="bg-gray-50">
                           <td className="px-4 py-3 font-medium">Ação</td>
                           {item.proposals.map((proposal) => (
@@ -635,34 +539,6 @@ export function ProposalsComparisonContent() {
                       </tbody>
                     </table>
                   </div>
-
-                  {/* Automatic Analysis */}
-                  <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-                    <h4 className="font-medium mb-2 flex items-center gap-2">
-                      <TrendingUp className="w-4 h-4" />
-                      Análise Automática
-                    </h4>
-                    <div className="grid grid-cols-3 gap-4 text-sm">
-                      <div>
-                        <span className="text-muted-foreground">Melhor preço:</span>{" "}
-                        <span className="font-medium">
-                          {item.proposals.find((p) => p.unitPrice === bestPrice)?.supplierName}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Melhor validade:</span>{" "}
-                        <span className="font-medium">
-                          {item.proposals.find((p) => p.daysUntilExpiry === bestValidity)?.supplierName}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Melhor prazo:</span>{" "}
-                        <span className="font-medium">
-                          {item.proposals.find((p) => p.deliveryTime === bestDelivery)?.supplierName}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
                 </CardContent>
               </Card>
             )
@@ -671,115 +547,69 @@ export function ProposalsComparisonContent() {
       )}
 
       {/* Consolidated Analysis */}
-      <Card className="mb-6 mt-6">
-        <CardHeader>
-          <CardTitle>Análise Consolidada</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto mb-6">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b">
-                <tr>
-                  <th className="px-4 py-3 text-left text-sm font-semibold">Fornecedor</th>
-                  <th className="px-4 py-3 text-center text-sm font-semibold">Valor Total</th>
-                  <th className="px-4 py-3 text-center text-sm font-semibold">Prazo Médio</th>
-                  <th className="px-4 py-3 text-center text-sm font-semibold">Conformidade</th>
-                  <th className="px-4 py-3 text-center text-sm font-semibold">Score Ponderado</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                <tr>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <Avatar>
-                        <AvatarFallback className="bg-twilight text-imperial">FA</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <div className="font-medium">Fornecedor A</div>
-                        <div className="text-sm text-muted-foreground">Score: 92%</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <div className="font-bold text-imperial">775.00 MT</div>
-                  </td>
-                  <td className="px-4 py-3 text-center">5 dias</td>
-                  <td className="px-4 py-3 text-center">
-                    <Progress value={100} className="h-2" />
-                    <div className="text-sm mt-1">100%</div>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <div className="text-lg font-bold text-imperial">89</div>
-                  </td>
-                </tr>
-                <tr>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <Avatar>
-                        <AvatarFallback className="bg-twilight text-imperial">FB</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <div className="font-medium">Fornecedor B</div>
-                        <div className="text-sm text-muted-foreground">Score: 88%</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <div className="font-bold text-imperial">862.50 MT</div>
-                  </td>
-                  <td className="px-4 py-3 text-center">7 dias</td>
-                  <td className="px-4 py-3 text-center">
-                    <Progress value={90} className="h-2" />
-                    <div className="text-sm mt-1">90%</div>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <div className="text-lg font-bold">85</div>
-                  </td>
-                </tr>
-                <tr>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <Avatar>
-                        <AvatarFallback className="bg-twilight text-imperial">FC</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <div className="font-medium">Fornecedor C</div>
-                        <div className="text-sm text-muted-foreground">Score: 85%</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <div className="font-bold text-imperial">1005.00 MT</div>
-                  </td>
-                  <td className="px-4 py-3 text-center">3.5 dias</td>
-                  <td className="px-4 py-3 text-center">
-                    <Progress value={100} className="h-2" />
-                    <div className="text-sm mt-1">100%</div>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <div className="text-lg font-bold">82</div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+      {items.length > 0 && (
+        <Card className="mb-6 mt-6">
+          <CardHeader>
+            <CardTitle>Análise Consolidada</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-sm font-semibold">Fornecedor</th>
+                    <th className="px-4 py-3 text-center text-sm font-semibold">Valor Total</th>
+                    <th className="px-4 py-3 text-center text-sm font-semibold">Prazo Médio</th>
+                    <th className="px-4 py-3 text-center text-sm font-semibold">Conformidade</th>
+                    <th className="px-4 py-3 text-center text-sm font-semibold">Score</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {allSuppliers.map((supplier) => {
+                    // Compute total and delivery dynamically
+                    const supplierProps = items.map(item => {
+                      const prop = item.proposals.find(p => p.supplierId === supplier.supplierId)
+                      return {
+                        price: (prop?.unitPrice || 0) * item.quantity,
+                        deliveryTime: prop?.deliveryTime || 0
+                      }
+                    })
+                    const totalVal = supplierProps.reduce((sum, p) => sum + p.price, 0)
+                    const avgDelivery = supplierProps.reduce((sum, p) => sum + p.deliveryTime, 0) / items.length
 
-          {/* Radar Chart */}
-          <div className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <RadarChart data={radarData}>
-                <PolarGrid />
-                <PolarAngleAxis dataKey="subject" />
-                <PolarRadiusAxis angle={90} domain={[0, 100]} />
-                <Radar name="Fornecedor A" dataKey="A" stroke="#10B981" fill="#10B981" fillOpacity={0.3} />
-                <Radar name="Fornecedor B" dataKey="B" stroke="#3B82F6" fill="#3B82F6" fillOpacity={0.3} />
-                <Radar name="Fornecedor C" dataKey="C" stroke="#8B5CF6" fill="#8B5CF6" fillOpacity={0.3} />
-                <Legend />
-              </RadarChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
+                    return (
+                      <tr key={supplier.supplierId}>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <Avatar>
+                              <AvatarFallback className="bg-twilight text-imperial">{supplier.supplierInitials}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <div className="font-medium">{supplier.supplierName}</div>
+                              <div className="text-sm text-muted-foreground">Score: {supplier.supplierScore}%</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <div className="font-bold text-imperial">{totalVal.toFixed(2)} MT</div>
+                        </td>
+                        <td className="px-4 py-3 text-center">{avgDelivery.toFixed(1)} dias</td>
+                        <td className="px-4 py-3 text-center">
+                          <Progress value={100} className="h-2" />
+                          <div className="text-sm mt-1">100%</div>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <div className="text-lg font-bold text-imperial">{supplier.supplierScore}</div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Decision and Selection */}
       <Card>
@@ -787,7 +617,7 @@ export function ProposalsComparisonContent() {
           <CardTitle>Decisão e Seleção</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {items.every((item) => item.selectedSupplier) ? (
+          {items.length > 0 && items.every((item) => item.selectedSupplier) ? (
             <>
               <div className="bg-twilight p-4 rounded-lg">
                 <h4 className="font-medium mb-2 flex items-center gap-2">
@@ -814,7 +644,7 @@ export function ProposalsComparisonContent() {
                   Justificativa da Escolha <span className="text-red-500">*</span>
                 </Label>
                 <Textarea
-                  placeholder="Por que escolheu este(s) fornecedor(es)? Considerações sobre desvios (se houver)..."
+                  placeholder="Por que escolheu este(s) fornecedor(es)?..."
                   value={justification}
                   onChange={(e) => setJustification(e.target.value)}
                   rows={4}
@@ -842,16 +672,6 @@ export function ProposalsComparisonContent() {
                     Confirmo a seleção do(s) fornecedor(es) <span className="text-red-500">*</span>
                   </label>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="approved"
-                    checked={confirmations.approved}
-                    onCheckedChange={(checked) => setConfirmations({ ...confirmations, approved: !!checked })}
-                  />
-                  <label htmlFor="approved" className="text-sm cursor-pointer">
-                    Obtive aprovações necessárias (se aplicável)
-                  </label>
-                </div>
               </div>
 
               <Button className="w-full bg-imperial hover:bg-imperial" onClick={handleGeneratePO}>
@@ -875,7 +695,7 @@ export function ProposalsComparisonContent() {
           <DialogHeader>
             <DialogTitle>Gerar Pedido de Compra?</DialogTitle>
             <DialogDescription>
-              Isso irá fechar a RFQ e criar automaticamente o(s) PO(s) com os fornecedores selecionados.
+              Isso criará automaticamente o(s) PO(s) no sistema com os fornecedores selecionados.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
@@ -906,7 +726,3 @@ export function ProposalsComparisonContent() {
     </div>
   )
 }
-
-
-
-

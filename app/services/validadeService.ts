@@ -88,8 +88,21 @@ export const validadeService = {
     return response.data;
   },
 
-  criarCampanhaValidade: async (dados: { descontoPct: number; loteIds: string[] }) => {
+  criarCampanhaValidade: async (dados: {
+    descontoPct: number;
+    loteIds: string[];
+    nome?: string;
+    descricao?: string;
+    dataInicio?: string;
+    dataFim?: string;
+    responsavel?: string;
+  }) => {
     const response = await api.post('/validade/campanhas', dados);
+    return response.data;
+  },
+
+  listarCampanhas: async (): Promise<any[]> => {
+    const response = await api.get('/validade/campanhas');
     return response.data;
   }
 };

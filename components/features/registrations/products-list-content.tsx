@@ -704,7 +704,7 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { produtoService, ProdutoData } from "@/app/services/produtoService"
 
-type SortField = "sku" | "descricao" | "categoria" | "vida_util_dias" | "status_ativo"
+type SortField = "sku" | "descricao" | "categoria" | "vida_util_dias" | "status_ativo" | "createdAt"
 type SortDirection = "asc" | "desc"
 
 const categoryColors: Record<string, string> = {
@@ -728,8 +728,8 @@ export function ProductsListContent() {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
   const [statusFilter, setStatusFilter] = useState("Todos")
   const [lotControlFilter, setLotControlFilter] = useState("Todos")
-  const [sortField, setSortField] = useState<SortField>("sku")
-  const [sortDirection, setSortDirection] = useState<SortDirection>("asc")
+  const [sortField, setSortField] = useState<SortField>("createdAt")
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc")
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(25)
   const [selectedProducts, setSelectedProducts] = useState<string[]>([])
@@ -785,8 +785,8 @@ export function ProductsListContent() {
     }
 
     filtered.sort((a, b) => {
-      let aValue: any = a[sortField]
-      let bValue: any = b[sortField]
+      let aValue: any = a[sortField] ?? ""
+      let bValue: any = b[sortField] ?? ""
 
       if (typeof aValue === "string") aValue = aValue.toLowerCase()
       if (typeof bValue === "string") bValue = bValue.toLowerCase()
@@ -1038,6 +1038,7 @@ export function ProductsListContent() {
                 <SelectItem value="Fresco">Fresco</SelectItem>
                 <SelectItem value="Seco">Seco</SelectItem>
                 <SelectItem value="Congelado">Congelado</SelectItem>
+                <SelectItem value="Laticínios">Laticínios</SelectItem>
                 <SelectItem value="Bebidas">Bebidas</SelectItem>
                 <SelectItem value="Limpeza">Limpeza</SelectItem>
                 <SelectItem value="Outros">Outros</SelectItem>

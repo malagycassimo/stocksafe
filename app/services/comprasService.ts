@@ -80,5 +80,36 @@ export const comprasService = {
   getComparativoPropostas: async (rfqId: string): Promise<ComparativoPropostasResponse> => {
     const response = await api.get(`/rfqs/${rfqId}/propostas`);
     return response.data;
+  },
+
+  listarPOs: async (): Promise<any[]> => {
+    const response = await api.get('/purchase-orders');
+    return response.data;
+  },
+
+  createPO: async (dados: {
+    codigo: string;
+    fornecedorId: string;
+    propostaId?: string;
+    totalValue: number;
+    expectedDelivery: string;
+  }): Promise<any> => {
+    const response = await api.post('/purchase-orders', dados);
+    return response.data;
+  },
+
+  obterPO: async (id: string): Promise<any> => {
+    const response = await api.get(`/purchase-orders/${id}`);
+    return response.data;
+  },
+
+  cancelarRFQ: async (id: string): Promise<any> => {
+    const response = await api.delete(`/rfqs/${id}`);
+    return response.data;
+  },
+
+  cancelarPO: async (id: string): Promise<any> => {
+    const response = await api.delete(`/purchase-orders/${id}`);
+    return response.data;
   }
 };

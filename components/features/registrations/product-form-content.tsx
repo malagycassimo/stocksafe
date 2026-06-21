@@ -69,6 +69,7 @@ export interface ProductFormData {
     humidity: string
     customHumidity?: number
     otherConditions: string[]
+    customRestrictions?: string
   }
   defaultLocations: string[]
   maxStacking: number
@@ -117,6 +118,7 @@ const initialFormData: ProductFormData = {
     temperature: "ambiente",
     humidity: "ambiente",
     otherConditions: [],
+    customRestrictions: "",
   },
   defaultLocations: [],
   maxStacking: 0,
@@ -143,11 +145,25 @@ function mapApiParaFormulario(api: ProdutoData): ProductFormData {
       alertDays = JSON.parse(api.alertas_dias_config)
   } catch {}
 
-  // restricoes_armazenagem guarda o array de "otherConditions" como JSON
+  // restricoes_armazenagem guarda o array de "otherConditions" como JSON ou string de texto livre
   let otherConditions: string[] = []
-  try {
-    if (api.restricoes_armazenagem) otherConditions = JSON.parse(api.restricoes_armazenagem)
-  } catch {}
+  let customRestrictions = ""
+  if (api.restricoes_armazenagem) {
+    try {
+      const parsed = typeof api.restricoes_armazenagem === "string"
+        ? JSON.parse(api.restricoes_armazenagem)
+        : api.restricoes_armazenagem
+      if (Array.isArray(parsed)) {
+        otherConditions = parsed
+      } else if (typeof parsed === "string") {
+        customRestrictions = parsed
+      }
+    } catch {
+      if (typeof api.restricoes_armazenagem === "string") {
+        customRestrictions = api.restricoes_armazenagem
+      }
+    }
+  }
 
   return {
     sku: api.sku ?? "",
@@ -184,6 +200,7 @@ function mapApiParaFormulario(api: ProdutoData): ProductFormData {
       temperature: api.condicao_temperatura ?? "ambiente",
       humidity: api.condicao_umidade ?? "ambiente",
       otherConditions,
+      customRestrictions,
     },
     defaultLocations: [],
     maxStacking: api.empilhamento_maximo ?? 0,
@@ -232,8 +249,8 @@ function mapFormularioParaApi(form: ProductFormData): ProdutoData {
     condicao_temperatura: form.storageType.temperature,
     condicao_umidade: form.storageType.humidity,
     restricoes_armazenagem:
-      form.storageType.otherConditions.length > 0
-        ? JSON.stringify(form.storageType.otherConditions)
+      form.storageType.customRestrictions || form.storageType.otherConditions.length > 0
+        ? form.storageType.customRestrictions || JSON.stringify(form.storageType.otherConditions)
         : null,
     peso_unidade: form.weightPerUnit,
     unidade_peso: form.weightUnit,

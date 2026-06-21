@@ -1,9 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { Save, Send, AlertTriangle, CheckCircle, Clock, Download } from "lucide-react"
+import { useRouter, useParams } from "next/navigation"
+import { Save, Send, AlertTriangle, CheckCircle, Clock, Download, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -22,6 +22,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { comprasService } from "@/app/services/comprasService"
+import { api } from "@/app/services/api"
 
 interface RfqItemResponse {
   id: string
@@ -45,49 +47,16 @@ interface RfqItemResponse {
 
 export function SupplierRfqResponseContent() {
   const router = useRouter()
+  const params = useParams()
+  const rfqId = params?.id as string
   const { toast } = useToast()
   const [showConfirmModal, setShowConfirmModal] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [rfq, setRfq] = useState<any>(null)
+  const [suppliers, setSuppliers] = useState<any[]>([])
+  const [selectedSupplierId, setSelectedSupplierId] = useState<string>("")
 
-  const [items, setItems] = useState<RfqItemResponse[]>([
-    {
-      id: "1",
-      sku: "LMP-001",
-      description: "Detergente Neutro - 5L",
-      quantity: 10,
-      unit: "UN",
-      minValidity: 180,
-      specifications: "Biodegradável, pH neutro",
-      proposedLot: "",
-      proposedExpiry: "",
-      datasheet: "",
-      unitPrice: "",
-      currency: "MT",
-      deliveryTime: "",
-      deliveryUnit: "dias",
-      observations: "",
-      isComplete: false,
-      validityWarning: false,
-    },
-    {
-      id: "2",
-      sku: "LMP-015",
-      description: "Desinfetante Multiuso - 2L",
-      quantity: 15,
-      unit: "UN",
-      minValidity: 270,
-      specifications: "",
-      proposedLot: "",
-      proposedExpiry: "",
-      datasheet: "",
-      unitPrice: "",
-      currency: "MT",
-      deliveryTime: "",
-      deliveryUnit: "dias",
-      observations: "",
-      isComplete: false,
-      validityWarning: false,
-    },
-  ])
+  const [items, setItems] = useState<RfqItemResponse[]>([])
 
   const [generalConditions, setGeneralConditions] = useState({
     paymentTerms: "",
@@ -106,6 +75,61 @@ export function SupplierRfqResponseContent() {
     signerPosition: "",
     digitalSignature: false,
   })
+
+  useEffect(() => {
+    if (!rfqId) return
+    setLoading(true)
+
+    // Load RFQ details
+    comprasService.obterRFQ(rfqId)
+      .then((data) => {
+        setRfq(data)
+        if (data.items) {
+          setItems(data.items.map((item: any) => ({
+            id: item.produto?.id || item.produtoId,
+            sku: item.produto?.sku || "PROD",
+            description: item.produto?.descricao || "Produto",
+            quantity: item.quantidade,
+            unit: item.produto?.unidade_medida || "UN",
+            minValidity: item.produto?.vida_util_dias || 180,
+            specifications: item.observacoes || "",
+            proposedLot: "",
+            proposedExpiry: "",
+            datasheet: "DS-2024-001",
+            unitPrice: "",
+            currency: "MT",
+            deliveryTime: "",
+            deliveryUnit: "dias",
+            observations: "",
+            isComplete: false,
+            validityWarning: false
+          })))
+        }
+      })
+      .catch((err) => {
+        console.error("Erro ao carregar RFQ:", err)
+        toast({
+          title: "Erro",
+          description: "Não foi possível carregar os detalhes da RFQ.",
+          variant: "destructive"
+        })
+      })
+
+    // Load suppliers
+    api.get("/fornecedores")
+      .then((res) => {
+        setSuppliers(res.data || [])
+        if (res.data && res.data.length > 0) {
+          setSelectedSupplierId(res.data[0].id)
+        }
+      })
+      .catch((err) => {
+        console.error("Erro ao carregar fornecedores:", err)
+      })
+      .finally(() => {
+        setLoading(false)
+      })
+  }, [rfqId])
 
   const calculateDaysUntilExpiry = (expiryDate: string) => {
     if (!expiryDate) return 0
@@ -173,10 +197,8 @@ export function SupplierRfqResponseContent() {
     if (
       !confirmation.dataCorrect ||
       !confirmation.lotsAvailable ||
-      !confirmation.termsAccepted ||
       !confirmation.signerName ||
-      !confirmation.signerPosition ||
-      !confirmation.digitalSignature
+      !confirmation.signerPosition
     ) {
       toast({
         title: "Confirmação incompleta",
@@ -190,11 +212,43 @@ export function SupplierRfqResponseContent() {
   }
 
   const confirmSubmit = () => {
-    toast({
-      title: "Resposta enviada com sucesso!",
-      description: "O comprador foi notificado da sua proposta.",
-    })
-    router.push("/compras/portal-fornecedor")
+    if (!selectedSupplierId) {
+      toast({
+        title: "Fornecedor não selecionado",
+        description: "Selecione o fornecedor que está a responder.",
+        variant: "destructive"
+      })
+      return
+    }
+
+    const payload = {
+      rfqId,
+      fornecedorId: selectedSupplierId,
+      prazoEntrega: parseInt(items[0]?.deliveryTime || "0", 10),
+      itens: items.map(item => ({
+        produtoId: item.id,
+        precoUnitario: parseFloat(item.unitPrice),
+        quantidade: item.quantity
+      }))
+    }
+
+    comprasService.submitProposta(payload)
+      .then(() => {
+        toast({
+          title: "Resposta enviada com sucesso!",
+          description: "O comprador foi notificado da sua proposta.",
+        })
+        setShowConfirmModal(false)
+        router.push("/compras/rfqs")
+      })
+      .catch((err: any) => {
+        console.error("Erro ao enviar proposta:", err)
+        toast({
+          title: "Erro ao enviar proposta",
+          description: err.response?.data?.error || "Ocorreu um erro ao enviar a proposta.",
+          variant: "destructive"
+        })
+      })
   }
 
   const completeItems = items.filter((item) => item.isComplete).length
@@ -203,32 +257,39 @@ export function SupplierRfqResponseContent() {
     items.reduce((sum, item) => sum + (Number.parseInt(item.deliveryTime) || 0), 0) / items.length || 0
   const conformingItems = items.filter((item) => item.isComplete && !item.validityWarning).length
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px] text-muted-foreground">
+        <RefreshCw className="w-8 h-8 animate-spin mr-3 text-imperial" />
+        Carregando cotação e dados do fornecedor...
+      </div>
+    )
+  }
+
   return (
     <div className="p-6">
       {/* Breadcrumb */}
       <div className="text-sm text-muted-foreground mb-4">
-        <Link href="/compras/portal-fornecedor" className="hover:text-imperial">
-          Portal Fornecedor
-        </Link>
-        {" / "}
-        <Link href="/compras/portal-fornecedor" className="hover:text-imperial">
+        <Link href="/compras/rfqs" className="hover:text-imperial">
           RFQs
         </Link>
         {" / "}
-        <span className="text-foreground">Responder RFQ #RFQ-2025-001</span>
+        <span className="text-foreground">Responder RFQ #{rfq?.codigo || rfqId}</span>
       </div>
 
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-imperial mb-2">Responder Cotação RFQ #RFQ-2025-001</h1>
-          <Badge className="bg-orange-100 text-orange-800">
-            <Clock className="w-3 h-3 mr-1" />
-            Prazo: 18h 30min restantes
-          </Badge>
+          <h1 className="text-3xl font-bold text-imperial mb-2">Responder Cotação RFQ #{rfq?.codigo || rfqId}</h1>
+          <div className="flex items-center gap-4">
+            <Badge className="bg-orange-100 text-orange-800">
+              <Clock className="w-3 h-3 mr-1" />
+              Prazo de Resposta: {new Date(rfq?.dataLimite).toLocaleString("pt-BR")}
+            </Badge>
+          </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => router.push("/compras/portal-fornecedor")}>
+          <Button variant="outline" onClick={() => router.push("/compras/rfqs")}>
             Cancelar
           </Button>
           <Button variant="outline" onClick={handleSaveProgress}>
@@ -242,6 +303,30 @@ export function SupplierRfqResponseContent() {
         </div>
       </div>
 
+      {/* Fornecedor Selection (Demo Simulation mode) */}
+      <Card className="mb-6 border-imperial bg-twilight">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg text-imperial font-bold">Simulação de Fornecedor</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col gap-2 max-w-[400px]">
+            <Label className="font-semibold text-gray-700">Selecione qual Fornecedor está a responder:</Label>
+            <Select value={selectedSupplierId} onValueChange={setSelectedSupplierId}>
+              <SelectTrigger className="bg-white">
+                <SelectValue placeholder="Selecione o Fornecedor" />
+              </SelectTrigger>
+              <SelectContent>
+                {suppliers.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.razao_social} {s.nome_fantasia ? `(${s.nome_fantasia})` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* RFQ Information */}
       <Card className="mb-6">
         <CardHeader>
@@ -251,7 +336,7 @@ export function SupplierRfqResponseContent() {
           <div className="grid grid-cols-3 gap-4">
             <div>
               <Label className="text-muted-foreground">Nº RFQ</Label>
-              <div className="font-mono font-medium">RFQ-2025-001</div>
+              <div className="font-mono font-medium">{rfq?.codigo || rfqId}</div>
             </div>
             <div>
               <Label className="text-muted-foreground">Cliente/Comprador</Label>
@@ -259,24 +344,15 @@ export function SupplierRfqResponseContent() {
             </div>
             <div>
               <Label className="text-muted-foreground">Data de Criação</Label>
-              <div>15/01/2025</div>
+              <div>{new Date(rfq?.createdAt).toLocaleDateString("pt-BR")}</div>
             </div>
             <div>
               <Label className="text-muted-foreground">Prazo de Resposta</Label>
-              <div className="font-medium text-orange-600">17/01/2025 18:00</div>
+              <div className="font-medium text-orange-600">{new Date(rfq?.dataLimite).toLocaleString("pt-BR")}</div>
             </div>
             <div className="col-span-2">
               <Label className="text-muted-foreground">Instruções do Comprador</Label>
-              <div className="text-sm">Favor incluir datasheets atualizados para todos os produtos.</div>
-            </div>
-          </div>
-          <div className="mt-4 pt-4 border-t">
-            <Label className="text-muted-foreground mb-2 block">Documentos Anexados</Label>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm">
-                <Download className="w-4 h-4 mr-2" />
-                Especificações Técnicas.pdf
-              </Button>
+              <div className="text-sm">Favor incluir datasheets e lotes válidos para todos os produtos selecionados.</div>
             </div>
           </div>
         </CardContent>
@@ -339,7 +415,7 @@ export function SupplierRfqResponseContent() {
                           </div>
                           {item.specifications && (
                             <div>
-                              <Label className="text-muted-foreground">Especificações Adicionais</Label>
+                              <Label className="text-muted-foreground">Observações/Especificações</Label>
                               <div>{item.specifications}</div>
                             </div>
                           )}
@@ -353,13 +429,10 @@ export function SupplierRfqResponseContent() {
                             Lote Proposto <span className="text-red-500">*</span>
                           </Label>
                           <Input
-                            placeholder="Ex: L2025-001"
+                            placeholder="Ex: L2026-099"
                             value={item.proposedLot}
                             onChange={(e) => updateItem(item.id, "proposedLot", e.target.value)}
                           />
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Informe o lote que você pretende fornecer
-                          </p>
                         </div>
 
                         <div>
@@ -376,8 +449,7 @@ export function SupplierRfqResponseContent() {
                               {daysUntilExpiry < item.minValidity ? (
                                 <p className="text-xs text-red-600 flex items-center gap-1">
                                   <AlertTriangle className="w-3 h-3" />
-                                  Atenção: Validade proposta ({daysUntilExpiry} dias) é inferior ao mínimo requerido (
-                                  {item.minValidity} dias)
+                                  Atenção: Validade proposta ({daysUntilExpiry} dias) é inferior ao mínimo requerido ({item.minValidity} dias)
                                 </p>
                               ) : (
                                 <p className="text-xs text-imperial">
@@ -397,11 +469,10 @@ export function SupplierRfqResponseContent() {
                             onValueChange={(value) => updateItem(item.id, "datasheet", value)}
                           >
                             <SelectTrigger>
-                              <SelectValue placeholder="Selecionar ou fazer upload..." />
+                              <SelectValue placeholder="Selecionar datasheet..." />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="DS-2024-001">DS-2024-001 - Detergente Neutro v2.1</SelectItem>
-                              <SelectItem value="upload">+ Fazer Upload de Novo Documento</SelectItem>
+                              <SelectItem value="DS-2024-001">DS-2026-001 - Ficha Técnica Atualizada</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -429,7 +500,6 @@ export function SupplierRfqResponseContent() {
                               <SelectContent>
                                 <SelectItem value="MT">MT</SelectItem>
                                 <SelectItem value="USD">USD</SelectItem>
-                                <SelectItem value="EUR">EUR</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
@@ -447,7 +517,7 @@ export function SupplierRfqResponseContent() {
                           <div className="flex gap-2">
                             <Input
                               type="number"
-                              placeholder="0"
+                              placeholder="5"
                               value={item.deliveryTime}
                               onChange={(e) => updateItem(item.id, "deliveryTime", e.target.value)}
                               className="flex-1"
@@ -461,7 +531,6 @@ export function SupplierRfqResponseContent() {
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="dias">Dias</SelectItem>
-                                <SelectItem value="semanas">Semanas</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
@@ -470,7 +539,7 @@ export function SupplierRfqResponseContent() {
                         <div className="col-span-2">
                           <Label>Observações do Item</Label>
                           <Textarea
-                            placeholder="Informações adicionais sobre este item, condições especiais, etc."
+                            placeholder="Especificações, variações do lote, etc."
                             value={item.observations}
                             onChange={(e) => updateItem(item.id, "observations", e.target.value)}
                             rows={2}
@@ -544,7 +613,6 @@ export function SupplierRfqResponseContent() {
                   <SelectItem value="EXW">EXW - Ex Works</SelectItem>
                   <SelectItem value="FOB">FOB - Free on Board</SelectItem>
                   <SelectItem value="CIF">CIF - Cost, Insurance and Freight</SelectItem>
-                  <SelectItem value="DDP">DDP - Delivered Duty Paid</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -560,8 +628,6 @@ export function SupplierRfqResponseContent() {
                 <SelectContent>
                   <SelectItem value="Incluso">Incluso</SelectItem>
                   <SelectItem value="FOB">FOB</SelectItem>
-                  <SelectItem value="CIF">CIF</SelectItem>
-                  <SelectItem value="Outro">Outro</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -571,15 +637,6 @@ export function SupplierRfqResponseContent() {
                 type="number"
                 value={generalConditions.proposalValidity}
                 onChange={(e) => setGeneralConditions({ ...generalConditions, proposalValidity: e.target.value })}
-              />
-            </div>
-            <div className="col-span-2">
-              <Label>Observações Gerais</Label>
-              <Textarea
-                placeholder="Informações adicionais sobre a proposta..."
-                value={generalConditions.generalObservations}
-                onChange={(e) => setGeneralConditions({ ...generalConditions, generalObservations: e.target.value })}
-                rows={3}
               />
             </div>
           </div>
@@ -646,20 +703,6 @@ export function SupplierRfqResponseContent() {
                   onChange={(e) => setConfirmation({ ...confirmation, signerPosition: e.target.value })}
                 />
               </div>
-              <div>
-                <Label>Data/Hora</Label>
-                <Input value={new Date().toLocaleString("pt-BR")} readOnly className="bg-gray-50" />
-              </div>
-            </div>
-            <div className="flex items-center gap-2 mt-4">
-              <Checkbox
-                id="digitalSignature"
-                checked={confirmation.digitalSignature}
-                onCheckedChange={(checked) => setConfirmation({ ...confirmation, digitalSignature: !!checked })}
-              />
-              <label htmlFor="digitalSignature" className="text-sm cursor-pointer font-medium">
-                Assino digitalmente esta proposta <span className="text-red-500">*</span>
-              </label>
             </div>
           </div>
         </CardContent>
@@ -669,10 +712,9 @@ export function SupplierRfqResponseContent() {
       <Dialog open={showConfirmModal} onOpenChange={setShowConfirmModal}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Enviar resposta para RFQ #RFQ-2025-001?</DialogTitle>
+            <DialogTitle>Enviar resposta para RFQ #{rfq?.codigo || rfqId}?</DialogTitle>
             <DialogDescription>
-              Após o envio, você não poderá mais editar esta resposta. Certifique-se de que todos os dados estão
-              corretos.
+              Após o envio, você não poderá mais editar esta resposta. Certifique-se de que todos os dados estão corretos.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
@@ -704,7 +746,3 @@ export function SupplierRfqResponseContent() {
     </div>
   )
 }
-
-
-
-
